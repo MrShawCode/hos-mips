@@ -1,7 +1,22 @@
-CMakeCache.txt
-CMakeFiles
-CMakeScripts
-Makefile
-cmake_install.cmake
-install_manifest.txt
-CTestTestfile.cmake
+# normal rules
+.*
+
+# do NOT ignore this file
+!.gitignore
+
+# build directories
+obj
+build-*
+
+# cscope files
+cscope.*
+
+# generated manuals
+*.man
+
+# vim file
+*~
+# other
+success.txt
+delete_part.txt
+*.backup
