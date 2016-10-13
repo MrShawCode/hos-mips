@@ -1,5 +1,5 @@
-#ifndef __GLUE_KIO_H__
-#define __GLUE_KIO_H__
+#ifndef __KIO_H__
+#define __KIO_H__
 
 #include <console.h>
 

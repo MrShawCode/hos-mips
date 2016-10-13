@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <error.h>
 #include <assert.h>
-#include <glue_kio.h>
+#include <kio.h>
 
 static int stdout_open(struct device *dev, uint32_t open_flags)
 {

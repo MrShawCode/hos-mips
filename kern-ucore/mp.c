@@ -1,4 +1,3 @@
-#include <glue_mp.h>
 #include <mp.h>
 #include <proc.h>
 #include <pmm.h>

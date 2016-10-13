@@ -8,7 +8,7 @@
 #include <mmu.h>
 #include <pmm.h>
 #include <memlayout.h>
-#include <glue_pgmap.h>
+#include <pgmap.h>
 #include <assert.h>
 #include <console.h>
 #include <kdebug.h>

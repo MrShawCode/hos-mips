@@ -21,6 +21,8 @@
 #include <stdio.h>
 #include <mp.h>
 #include <resource.h>
+#include <asm/mipsregs.h>
+#include <asm/regdef.h>
 
 //#define DEBUG_PROCESS
 
@@ -2029,3 +2031,16 @@ int kernel_thread(int (*fn) (void *), void *arg, uint32_t clone_flags)
 	return do_fork(clone_flags | CLONE_VM, 0, &tf);
 }
 
+/* $a0 = arg, $a1 = func
+ * see proc.c:kernel_thread
+ */
+void kernel_thread_entry(void)
+{
+	__asm__ __volatile__("addiu $sp, $sp, -16\n");
+	__asm__ __volatile__("jal $a1\n");
+	__asm__ __volatile__("nop\n");
+	__asm__ __volatile__("move $a0, $v0\n");
+	__asm__ __volatile__("la  $t0, do_exit\n");
+	__asm__ __volatile__("jal $t0\n");
+	__asm__ __volatile__("nop\n");
+}

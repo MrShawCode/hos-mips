@@ -1,9 +1,22 @@
 #ifndef __GLUE_UCORE_MP_H__
 #define __GLUE_UCORE_MP_H__
 
-#include <glue_mp.h>
-#include <glue_memlayout.h>
+#include <mp.h>
+#include <memlayout.h>
 #include <types.h>
+
+#define LAPIC_COUNT 1
+
+#define PLS
+
+#define pls_read(var) pls_##var
+
+#define pls_get_ptr(var) &pls_##var
+
+#define pls_write(var, value)											\
+	do {																\
+		pls_##var = value;                                              \
+	} while (0)
 
 extern int pls_lapic_id;
 extern int pls_lcpu_idx;

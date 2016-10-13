@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <sem.h>
 #include <event.h>
-#include <glue_mp.h>
+#include <mp.h>
 #include <elf.h>
 #include <arch_proc.h>
 #include <signal.h>

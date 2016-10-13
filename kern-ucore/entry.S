@@ -2,8 +2,6 @@
 #include <asm/mipsregs.h>
 
 .global kernel_entry
-.global kernel_thread_entry
-
 .extern kern_init
 
 .extern edata
@@ -68,30 +66,6 @@ reset:
   bgez $zero, .
   nop
 
-
-# bfc00280: R4000 xtlbmiss vector
-romExcHandle_280:
-  b romExcHandle_280
-  nop
-
-# bfc00300: R4000 cache vector
-romExcHandle_300:
-  b romExcHandle_300
-  nop
-
-/* $a0 = arg, $a1 = func
- * see proc.c:kernel_thread
- */
-kernel_thread_entry:        # void kernel_thread(void)
-  addiu $sp, $sp, -16
-  jal $a1
-  nop
-  move $a0, $v0
-  la  $t0, do_exit
-  jal $t0 
-  nop
-  /* never here */
-
 .section .data
     .global bootstack
 bootstack:
@@ -99,3 +73,4 @@ bootstack:
     .global bootstacktop
 bootstacktop:
     .space 32
+

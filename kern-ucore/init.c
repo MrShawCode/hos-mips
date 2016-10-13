@@ -13,17 +13,8 @@
 #include <thumips_tlb.h>
 #include <sched.h>
 
-void setup_exception_vector()
-{
-	//for QEMU sim
-	extern unsigned char __exception_vector, __exception_vector_end;
-	memcpy((unsigned int *)0xBFC00000, &__exception_vector,
-	       &__exception_vector_end - &__exception_vector);
-}
-
 void __noreturn kern_init(void)
 {
-	//setup_exception_vector();
 	tlb_invalidate_all();
 	char *p = 0x7ffff000;
 	mp_init();

@@ -2,7 +2,7 @@
 #define __KERN_MM_PMM_H__
 
 #include <defs.h>
-#include <glue_pgmap.h>
+#include <pgmap.h>
 #include <mmu.h>
 #include <memlayout.h>
 #include <atomic.h>

@@ -20,7 +20,7 @@
 
 #include <asm/mipsregs.h>
 #include <memlayout.h>
-#include <glue_pgmap.h>
+#include <pgmap.h>
 
 #define THUMIPS_TLB_ENTRYL_V (1<<1)
 #define THUMIPS_TLB_ENTRYL_D (1<<2)

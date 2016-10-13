@@ -11,7 +11,7 @@
 #include <unistd.h>
 #include <error.h>
 #include <assert.h>
-#include <glue_kio.h>
+#include <kio.h>
 
 #define STDIN_BUFSIZE               4096
 
