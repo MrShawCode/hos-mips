@@ -15,7 +15,7 @@ KTREE_OBJ_ROOT := $(OBJPATH_ROOT)/kernel
 
 export KTREE_OBJ_ROOT
 
-KERN_INCLUDES := include lib fs fs/vfs fs/pipe fs/sfs fs/devs
+KERN_INCLUDES := include include/lib include/fs
 
 TARGET_CFLAGS += $(addprefix -I$(KTREE)/, $(KERN_INCLUDES))
 
