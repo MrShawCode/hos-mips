@@ -31,8 +31,8 @@ USER_APPLIST := $(DEF_USER_APPS) $(EXTRA_USER_APPS)
 PHONY = clean all kernel
 
 # Composed
-#all: $(TOOLS_MKSFS) kernel
-all: kernel
+all: $(TOOLS_MKSFS) kernel
+#all: kernel
 	
 clean:
 	@echo Will clean all obj files.
