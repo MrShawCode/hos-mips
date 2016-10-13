@@ -3,7 +3,7 @@ include $(KCONFIG_AUTOCONFIG)
 endif
 
 ARCH_DIR := $(KTREE)
-BLTREE = $(TOPDIR)/src/bootloader
+BLTREE = $(TOPDIR)/bootloader
 
 KERNEL_ELF := $(KTREE_OBJ_ROOT)/ucore-kernel-initrd
 BOOTSECT   := $(OBJPATH_ROOT)/bootloader/loader.bin

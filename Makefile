@@ -6,7 +6,7 @@
 TOPDIR=$(shell pwd)
 Q :=@
 
-KTREE = $(TOPDIR)/src/kern-ucore
+KTREE = $(TOPDIR)/kern-ucore
 ifndef O
 OBJPATH_ROOT := $(TOPDIR)/obj
 else
