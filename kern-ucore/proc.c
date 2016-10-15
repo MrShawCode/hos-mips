@@ -326,12 +326,6 @@ static void de_thread(struct proc_struct *proc)
 		}
 		local_intr_restore(intr_flag);
 	}
-
-	de_thread_arch_hook(proc);
-}
-
-void de_thread_arch_hook(struct proc_struct *proc)
-{
 }
 
 // next_thread - get the next thread "proc" from thread_group list
@@ -1230,9 +1224,6 @@ int do_execve(const char *filename, const char **argv, const char **envp)
 
 	set_proc_name(current, local_name);
 
-	if (do_execve_arch_hook(argc, kargv) < 0)
-		goto execve_exit;
-
 	put_kargv(argc, kargv);
 	put_kargv(envc, kenvp);
 	return 0;
@@ -1971,11 +1962,6 @@ copy_thread(uint32_t clone_flags, struct proc_struct *proc, uintptr_t esp,
 	proc->tf->tf_regs.reg_r[MIPS_REG_SP] = esp;
 	proc->context.sf_ra = (uintptr_t) forkret;
 	proc->context.sf_sp = (uintptr_t) (proc->tf) - 32;
-	return 0;
-}
-
-int do_execve_arch_hook(int argc, char **kargv)
-{
 	return 0;
 }
 

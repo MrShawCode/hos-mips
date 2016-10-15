@@ -11,7 +11,7 @@
 #include <pgmap.h>
 #include <assert.h>
 #include <console.h>
-#include <kdebug.h>
+#include <monitor.h>
 #include <error.h>
 #include <syscall.h>
 #include <proc.h>

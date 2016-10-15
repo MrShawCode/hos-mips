@@ -3,7 +3,6 @@
 #include <mmu.h>
 #include <trap.h>
 #include <monitor.h>
-#include <kdebug.h>
 
 /* *
  * Simple command-line kernel monitor useful for controlling the
@@ -114,7 +113,34 @@ int mon_help(int argc, char **argv, struct trapframe *tf)
 }
 
 /* *
- * mon_kerninfo - call print_kerninfo in kern/debug/kdebug.c to
+ * print_kerninfo - print the information about kernel, including the location
+ * of kernel entry, the start addresses of data and text segements, the start
+ * address of free memory and how many memory that kernel has used.
+ * */
+void print_kerninfo(void)
+{
+	extern char etext[], edata[], end[], kern_init[];
+	kprintf("Special kernel symbols:\n");
+	kprintf("  entry  0x");
+	printhex((unsigned int)kern_init);
+	kprintf(" (phys)\n");
+	kprintf("  etext\t0x");
+	printhex((unsigned int)etext);
+	kprintf(" (phys)\n");
+	kprintf("  edata\t0x");
+	printhex((unsigned int)edata);
+	kprintf(" (phys)\n");
+	kprintf("  end\t0x");
+	printhex((unsigned int)end);
+	kprintf(" (phys)\n");
+	kprintf("Kernel executable memory footprint: ");
+	printbase10((end - etext + 1023) >> 10);
+	kprintf("KB\n");
+}
+
+
+/* *
+ * mon_kerninfo - call print_kerninfo to
  * print the memory occupancy in kernel.
  * */
 int mon_kerninfo(int argc, char **argv, struct trapframe *tf)

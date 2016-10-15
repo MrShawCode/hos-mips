@@ -4,6 +4,7 @@
 #include <trap.h>
 
 void monitor(struct trapframe *tf);
+void print_kerninfo(void);
 
 int mon_help(int argc, char **argv, struct trapframe *tf);
 int mon_kerninfo(int argc, char **argv, struct trapframe *tf);

@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <console.h>
-#include <kdebug.h>
+#include <monitor.h>
 #include <picirq.h>
 #include <trap.h>
 #include <clock.h>

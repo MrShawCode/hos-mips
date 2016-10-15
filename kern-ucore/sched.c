@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <assert.h>
 #include <sched_RR.h>
-#include <sched_MLFQ.h>
 #include <mips_io.h>
 #include <mp.h>
 #include <trap.h>
@@ -121,11 +120,8 @@ void sched_init(void)
 		__rq[i].max_time_slice = rq->max_time_slice * (1 << i);
 	}
 
-#ifdef UCONFIG_SCHEDULER_MLFQ
-	sched_class = &MLFQ_sched_class;
-#else
+
 	sched_class = &RR_sched_class;
-#endif
 	sched_class->init(rq);
 
 	kprintf("sched class: %s\n", sched_class->name);

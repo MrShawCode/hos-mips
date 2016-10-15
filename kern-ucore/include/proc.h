@@ -134,16 +134,11 @@ int do_linux_waitpid(int pid, int *code_store);
 struct proc_struct *alloc_proc(void);
 void switch_to(struct context *from, struct context *to);
 
-/* For TLS(Thread Local Storage */
-void tls_switch(struct proc_struct *proc);
-
-void de_thread_arch_hook(struct proc_struct *proc);
 int copy_thread(uint32_t clone_flags, struct proc_struct *proc,
 		uintptr_t user_stack, struct trapframe *tf);
 int init_new_context(struct proc_struct *proc, struct elfhdr *elf,
 		     int argc, char **kargv, int envc, char **kenvp);
 int kernel_thread(int (*fn) (void *), void *arg, uint32_t clone_flags);
 int kernel_execve(const char *name, const char **argv, const char **kenvp);
-int do_execve_arch_hook(int argc, char **kargv);
 
 #endif /* !__KERN_PROCESS_PROC_H__ */
