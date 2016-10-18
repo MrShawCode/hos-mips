@@ -3,7 +3,14 @@
 # alter files in config directory.
 #--------------------------------------------------------------
 
+UNAME := $(shell uname)
+
+ifeq ($(UNAME), Linux)
 TOPDIR=$(shell pwd)
+else	#cygwin
+TOPDIR=$(shell cygpath -w `pwd` | sed 's|\\|/|g')
+endif
+
 Q :=@
 
 KTREE = $(TOPDIR)/kern-ucore
