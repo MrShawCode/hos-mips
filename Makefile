@@ -14,11 +14,7 @@ endif
 Q :=@
 
 KTREE = $(TOPDIR)/kern-ucore
-ifndef O
 OBJPATH_ROOT := $(TOPDIR)/obj
-else
-OBJPATH_ROOT := $(abspath $(O))
-endif
 export TOPDIR KTREE OBJPATH_ROOT
 
 KCONFIG_AUTOCONFIG=$(TOPDIR)/Makefile.config
@@ -28,23 +24,16 @@ BIN := $(USER_OBJ_ROOT)/bin
 USER_APPLIST:= pwd cat sh ls cp echo guessnum #link mkdir rename unlink lsmod insmod rmmod mount umount
 USER_APP_BINS:= $(addprefix $(BIN)/, $(USER_APPLIST))
 
-CONFIG_SHELL:=$(shell if [ -x "$$BASH" ]; then echo $$BASH; \
-	else if [ -x /bin/bash ]; then echo /bin/bash; \
-	else echo sh; fi; fi)
-
 MAKEFLAGS += -rR --no-print-directory
 
--include $(KCONFIG_AUTOCONFIG)
+include $(KCONFIG_AUTOCONFIG)
 
 #### CROSS COMPILE HERE ####
 ARCH ?= $(patsubst "%",%,$(UCONFIG_ARCH))
-BOARD ?= default
 CROSS_COMPILE ?= $(UCONFIG_CROSS_COMPILE)
 
 export CONFIG_SHELL quiet Q KBUILD_VERBOSE
-export ARCH CROSS_COMPILE
-export KCONFIG_AUTOCONFIG
-
+export ARCH CROSS_COMPILE KCONFIG_AUTOCONFIG
 
 TARGET_CC := $(CROSS_COMPILE)gcc
 TARGET_LD := $(CROSS_COMPILE)ld
@@ -55,38 +44,18 @@ TARGET_OBJCOPY := $(CROSS_COMPILE)objcopy
 export TARGET_CC TARGET_LD TARGET_AR TARGET_LD TARGET_STRIP TARGET_OBJCOPY
 
 #FPGA or not
-
 ifeq  ($(ON_FPGA), y)
 MACH_DEF := -DMACH_FPGA
 else
 MACH_DEF := -DMACH_QEMU
 endif
 
-ifndef HOSTAR
 HOSTAR:=ar
-endif
-ifndef HOSTAS
 HOSTAS:=as
-endif
-ifndef HOSTCC
 HOSTCC:=gcc
-else
-endif
-ifndef HOSTCXX
 HOSTCXX:=g++
-endif
-ifndef HOSTLD
 HOSTLD:=ld
-endif
-ifndef HOSTLN
 HOSTLN:=ln
-endif
-HOSTAR:=$(shell $(CONFIG_SHELL) -c "which $(HOSTAR)" || type -p $(HOSTAR) || echo ar)
-HOSTAS:=$(shell $(CONFIG_SHELL) -c "which $(HOSTAS)" || type -p $(HOSTAS) || echo as)
-HOSTCC:=$(shell $(CONFIG_SHELL) -c "which $(HOSTCC)" || type -p $(HOSTCC) || echo gcc)
-HOSTCXX:=$(shell $(CONFIG_SHELL) -c "which $(HOSTCXX)" || type -p $(HOSTCXX) || echo g++)
-HOSTLD:=$(shell $(CONFIG_SHELL) -c "which $(HOSTLD)" || type -p $(HOSTLD) || echo ld)
-HOSTLN:=$(shell $(CONFIG_SHELL) -c "which $(HOSTLN)" || type -p $(HOSTLN) || echo ln)
 ifndef CFLAGS_FOR_BUILD
 CFLAGS_FOR_BUILD:=-g -O2
 endif
@@ -97,15 +66,15 @@ export HOSTCFLAGS
 
 PHONY+= clean all sfsimg
 
-PHONY+= $(OBJPATH_ROOT) $(KCONFIG_AUTOCONFIG)
+PHONY+= $(OBJPATH_ROOT)
 all: sfsimg kernel
 
 PHONY += kernel userlib userapp
 
-kernel: $(OBJPATH_ROOT) $(KCONFIG_AUTOCONFIG) $(SFSIMG_LINK)
+kernel: $(OBJPATH_ROOT) $(SFSIMG_LINK)
 	$(Q)$(MAKE)  -C $(KTREE) -f $(KTREE)/Makefile.build
 
-userlib: $(OBJPATH_ROOT) $(KCONFIG_AUTOCONFIG)
+userlib: $(OBJPATH_ROOT)
 	$(Q)$(MAKE) -f $(TOPDIR)/user/Makefile -C $(TOPDIR)/user  all
 
 define re-user-app
@@ -118,7 +87,7 @@ endef
 
 $(foreach bdir,$(USER_APP_BINS),$(eval $(call re-user-app,$(bdir))))
 
-userapp: $(OBJPATH_ROOT) $(KCONFIG_AUTOCONFIG)
+userapp: $(OBJPATH_ROOT)
 	$(Q)$(MAKE) -f $(TOPDIR)/user/user-ucore/Makefile -C $(TOPDIR)/user/user-ucore  all
 
 ## TOOLS 
