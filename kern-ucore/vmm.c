@@ -6,7 +6,6 @@
 #include <error.h>
 #include <pmm.h>
 #include <arch.h>
-#include <shmem.h>
 #include <proc.h>
 #include <sem.h>
 #include <mips_io.h>
@@ -165,8 +164,6 @@ struct vma_struct *vma_create(uintptr_t vm_start, uintptr_t vm_end,
 		vma->vm_start = vm_start;
 		vma->vm_end = vm_end;
 		vma->vm_flags = vm_flags;
-		vma->shmem = NULL;
-		vma->shmem_off = 0;
 	}
 	return vma;
 }
@@ -174,11 +171,6 @@ struct vma_struct *vma_create(uintptr_t vm_start, uintptr_t vm_end,
 // vma_destroy - free vma_struct
 static void vma_destroy(struct vma_struct *vma)
 {
-	if (vma->vm_flags & VM_SHARE) {
-		if (shmem_ref_dec(vma->shmem) == 0) {
-			shmem_destroy(vma->shmem);
-		}
-	}
 	kfree(vma);
 }
 
@@ -398,37 +390,10 @@ mm_map(struct mm_struct *mm, uintptr_t addr, size_t len, uint32_t vm_flags,
 out:
 	return ret;
 }
-
-int
-mm_map_shmem(struct mm_struct *mm, uintptr_t addr, uint32_t vm_flags,
-	     struct shmem_struct *shmem, struct vma_struct **vma_store)
-{
-	if ((addr % PGSIZE) != 0 || shmem == NULL) {
-		return -E_INVAL;
-	}
-	int ret;
-	struct vma_struct *vma;
-	shmem_ref_inc(shmem);
-	if ((ret = mm_map(mm, addr, shmem->len, vm_flags, &vma)) != 0) {
-		shmem_ref_dec(shmem);
-		return ret;
-	}
-	vma->shmem = shmem;
-	vma->shmem_off = 0;
-	vma->vm_flags |= VM_SHARE;
-	if (vma_store != NULL) {
-		*vma_store = vma;
-	}
-	return 0;
-}
-
 static void vma_resize(struct vma_struct *vma, uintptr_t start, uintptr_t end)
 {
 	assert(start % PGSIZE == 0 && end % PGSIZE == 0);
 	assert(vma->vm_start <= start && start < end && end <= vma->vm_end);
-	if (vma->vm_flags & VM_SHARE) {
-		vma->shmem_off += start - vma->vm_start;
-	}
 	vma->vm_start = start, vma->vm_end = end;
 }
 
@@ -505,12 +470,6 @@ int dup_mmap(struct mm_struct *to, struct mm_struct *from)
 		nvma = vma_create(vma->vm_start, vma->vm_end, vma->vm_flags);
 		if (nvma == NULL) {
 			return -E_NO_MEM;
-		} else {
-			if (vma->vm_flags & VM_SHARE) {
-				nvma->shmem = vma->shmem;
-				nvma->shmem_off = vma->shmem_off;
-				shmem_ref_inc(vma->shmem);
-			}
 		}
 		insert_vma_struct(to, nvma);
 		bool share = (vma->vm_flags & VM_SHARE);
@@ -808,24 +767,9 @@ int do_pgfault(struct mm_struct *mm, machine_word_t error_code, uintptr_t addr)
 			if (pgdir_alloc_page(mm->pgdir, addr, perm) == NULL) {
 				goto failed;
 			}
-		} else {	//shared mem
-			lock_shmem(vma->shmem);
-			uintptr_t shmem_addr =
-			    addr - vma->vm_start + vma->shmem_off;
-			pte_t *sh_ptep =
-			    shmem_get_entry(vma->shmem, shmem_addr, 1);
-			if (sh_ptep == NULL || ptep_invalid(sh_ptep)) {
-				unlock_shmem(vma->shmem);
-				goto failed;
-			}
-			unlock_shmem(vma->shmem);
-			if (ptep_present(sh_ptep)) {
-				page_insert(mm->pgdir, pa2page(*sh_ptep), addr,
-					    perm);
-			} else {
+		} else {
 				panic("NO SWAP\n");
 			}
-		}
 	} else {		//a present page, handle copy-on-write (cow) 
 		struct Page *page, *newpage = NULL;
 		bool cow =

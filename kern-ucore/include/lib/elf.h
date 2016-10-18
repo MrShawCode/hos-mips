@@ -287,13 +287,8 @@ static inline void _load_elfhdr(unsigned char *base, struct elfhdr32 *hdr)
 	hdr->e_shstrndx = t >> 16;
 }
 
-#ifndef ARCH_ARM
 #define elf_check_arch(x) \
 	(((x)->e_machine == EM_386) || ((x)->e_machine == EM_486))
-#else
-#define elf_check_arch(x) \
-    (((x)->e_machine == EM_ARM))
-#endif
 
 struct elfhdr {
 	uint32_t e_magic;	// must equal ELF_MAGIC

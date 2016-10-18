@@ -14,9 +14,6 @@ int spipe(spipe_t * p)
 	int ret;
 	sem_t spipe_sem;
 	uintptr_t addr = 0;
-	if ((ret = shmem(&addr, SPIPE_SIZE, MMAP_WRITE)) != 0) {
-		goto failed;
-	}
 	if ((spipe_sem = sem_init(1)) < 0) {
 		goto failed_cleanup_mem;
 	}

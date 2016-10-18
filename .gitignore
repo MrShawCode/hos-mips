@@ -25,3 +25,6 @@ src/user-ucore/_initial
 success.txt
 delete_part.txt
 *.backup
+*.log
+*.txt
+*.py

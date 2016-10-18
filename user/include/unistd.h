@@ -18,7 +18,6 @@
 #define SYS_brk             19
 #define SYS_mmap            20
 #define SYS_munmap          21
-#define SYS_shmem           22
 #define SYS_putc            30
 #define SYS_pgdir           31
 #define SYS_sem_init        40

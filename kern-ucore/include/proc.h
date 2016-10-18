@@ -127,7 +127,6 @@ int do_linux_brk(uintptr_t brk);
 int do_sleep(unsigned int time);
 int do_mmap(uintptr_t * addr_store, size_t len, uint32_t mmap_flags);
 int do_munmap(uintptr_t addr, size_t len);
-int do_shmem(uintptr_t * addr_store, size_t len, uint32_t mmap_flags);
 int do_linux_waitpid(int pid, int *code_store);
 
 /* Implemented by archs */

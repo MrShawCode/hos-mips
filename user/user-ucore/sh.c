@@ -227,7 +227,7 @@ int main(int argc, char **argv)
 		usage();
 		return -1;
 	}
-	shcwd = shmem_malloc(BUFSIZE);
+	shcwd = (char *)malloc(BUFSIZE);
 	assert(shcwd != NULL);
 
 	char *buffer;

@@ -85,11 +85,6 @@ int munmap(uintptr_t addr, size_t len)
 	return sys_munmap(addr, len);
 }
 
-int shmem(uintptr_t * addr_store, size_t len, uint32_t mmap_flags)
-{
-	return sys_shmem(addr_store, len, mmap_flags);
-}
-
 sem_t sem_init(int value)
 {
 	return sys_sem_init(value);

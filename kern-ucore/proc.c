@@ -268,7 +268,6 @@ static void put_kstack(struct proc_struct *proc)
 
 // setup_pgdir - alloc one page as PDT
 // XXX, PDT size != PGSIZE!!!
-#ifndef ARCH_ARM
 static int setup_pgdir(struct mm_struct *mm)
 {
 	struct Page *page;
@@ -287,33 +286,6 @@ static void put_pgdir(struct mm_struct *mm)
 {
 	free_page(kva2page(mm->pgdir));
 }
-#else
-#warning ARM PDT is 16k
-static int setup_pgdir(struct mm_struct *mm)
-{
-	struct Page *page;
-	/* 4 * 4K = 16K */
-#warning dirty hack
-	if ((page = alloc_pages(8)) == NULL) {
-		return -E_NO_MEM;
-	}
-	pgd_t *pgdir_start = page2kva(page);
-	pgd_t *pgdir = ROUNDUP(pgdir_start, 4 * PGSIZE);
-	memcpy(pgdir, init_pgdir_get(), 4 * PGSIZE);
-
-	map_pgdir(pgdir);
-	mm->pgdir = pgdir;
-	mm->pgdir_alloc_addr = pgdir_start;
-	return 0;
-}
-
-// put_pgdir - free the memory space of PDT
-static void put_pgdir(struct mm_struct *mm)
-{
-	assert(mm->pgdir_alloc_addr);
-	free_pages(kva2page(mm->pgdir_alloc_addr), 8);
-}
-#endif
 
 // de_thread - delete this thread "proc" from thread_group list
 static void de_thread(struct proc_struct *proc)
@@ -1674,57 +1646,6 @@ int do_munmap(uintptr_t addr, size_t len)
 	{
 		ret = mm_unmap(mm, addr, len);
 	}
-	unlock_mm(mm);
-	return ret;
-}
-
-// do_shmem - create a share memory with addr, len, flags(VM_READ/M_WRITE/VM_STACK)
-int do_shmem(uintptr_t * addr_store, size_t len, uint32_t mmap_flags)
-{
-	struct mm_struct *mm = current->mm;
-	if (mm == NULL) {
-		panic("kernel thread call mmap!!.\n");
-	}
-	if (addr_store == NULL || len == 0) {
-		return -E_INVAL;
-	}
-
-	int ret = -E_INVAL;
-
-	uintptr_t addr;
-
-	lock_mm(mm);
-	if (!copy_from_user(mm, &addr, addr_store, sizeof(uintptr_t), 1)) {
-		goto out_unlock;
-	}
-
-	uintptr_t start = ROUNDDOWN(addr, PGSIZE), end =
-	    ROUNDUP(addr + len, PGSIZE);
-	addr = start, len = end - start;
-
-	uint32_t vm_flags = VM_READ;
-	if (mmap_flags & MMAP_WRITE)
-		vm_flags |= VM_WRITE;
-	if (mmap_flags & MMAP_STACK)
-		vm_flags |= VM_STACK;
-
-	ret = -E_NO_MEM;
-	if (addr == 0) {
-		if ((addr = get_unmapped_area(mm, len)) == 0) {
-			goto out_unlock;
-		}
-	}
-	struct shmem_struct *shmem;
-	if ((shmem = shmem_create(len)) == NULL) {
-		goto out_unlock;
-	}
-	if ((ret = mm_map_shmem(mm, addr, vm_flags, shmem, NULL)) != 0) {
-		assert(shmem_ref(shmem) == 0);
-		shmem_destroy(shmem);
-		goto out_unlock;
-	}
-	copy_to_user(mm, addr_store, &addr, sizeof(uintptr_t));
-out_unlock:
 	unlock_mm(mm);
 	return ret;
 }

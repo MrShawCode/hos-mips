@@ -62,20 +62,6 @@ static bool morecore_brk_locked(size_t nu)
 	return 1;
 }
 
-static bool morecore_shmem_locked(size_t nu)
-{
-	size_t size = ((nu * sizeof(header_t) + 0xfff) & (~0xfff));
-	uintptr_t mem = 0;
-	if (sys_shmem(&mem, size, MMAP_WRITE) != 0 || mem == 0) {
-		return 0;
-	}
-	header_t *p = (void *)mem;
-	p->s.size = size / sizeof(header_t);
-	p->s.type = 1;
-	free_locked((void *)(p + 1));
-	return 1;
-}
-
 static void *malloc_locked(size_t size, bool type)
 {
 	static_assert(sizeof(header_t) == 0x40);
@@ -109,9 +95,7 @@ static void *malloc_locked(size_t size, bool type)
 		}
 		if (p == freep) {
 			bool(*morecore_locked) (size_t nu);
-			morecore_locked =
-			    (!type) ? morecore_brk_locked :
-			    morecore_shmem_locked;
+			morecore_locked = morecore_brk_locked;
 			if (!morecore_locked(nunits)) {
 				return NULL;
 			}
