@@ -28,3 +28,4 @@ delete_part.txt
 *.log
 *.txt
 *.py
+tmp/

@@ -58,36 +58,26 @@ static void check_vmm(void);
 static void check_vma_struct(void);
 static void check_pgfault(void);
 
-bool
-copy_from_user(struct mm_struct *mm, void *dst, const void *src, size_t len,
+bool copy_from_user(void *dst, const void *src, size_t len,
 	       bool writable)
 {
-	if (!user_mem_check(mm, (uintptr_t) src, len, writable)) {
-		return 0;
-	}
 	memcpy(dst, src, len);
 	return 1;
 }
 
-bool copy_to_user(struct mm_struct * mm, void *dst, const void *src, size_t len)
+bool copy_to_user(void *dst, const void *src, size_t len)
 {
-	if (!user_mem_check(mm, (uintptr_t) dst, len, 1)) {
-		return 0;
-	}
 	memcpy(dst, src, len);
 	return 1;
 }
 
-bool copy_string(struct mm_struct *mm, char *dst, const char *src, size_t maxn)
+bool copy_string(char *dst, const char *src, size_t maxn)
 {
 	size_t alen, part =
 	    ROUNDDOWN_2N((uintptr_t) src + PGSIZE, PGSHIFT) - (uintptr_t) src;
 	while (1) {
 		if (part > maxn) {
 			part = maxn;
-		}
-		if (!user_mem_check(mm, (uintptr_t) src, part, 0)) {
-			return 0;
 		}
 		if ((alen = strnlen(src, part)) < part) {
 			memcpy(dst, src, alen + 1);
@@ -712,7 +702,7 @@ int do_pgfault(struct mm_struct *mm, machine_word_t error_code, uintptr_t addr)
 		if (current != NULL && mm->locked_by == current->pid) {
 			need_unlock = 0;
 		} else {
-			lock_mm(mm);
+			
 		}
 	}
 
@@ -821,7 +811,7 @@ int do_pgfault(struct mm_struct *mm, machine_word_t error_code, uintptr_t addr)
 
 failed:
 	if (need_unlock) {
-		unlock_mm(mm);
+		
 	}
 	return ret;
 }

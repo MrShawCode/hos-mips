@@ -329,11 +329,9 @@ static int copy_mm(uint32_t clone_flags, struct proc_struct *proc)
 		goto bad_pgdir_cleanup_mm;
 	}
 
-	lock_mm(oldmm);
 	{
 		ret = dup_mmap(mm, oldmm);
 	}
-	unlock_mm(oldmm);
 
 	if (ret != 0) {
 		goto bad_dup_cleanup_mmap;
@@ -1050,7 +1048,7 @@ static void put_kargv(int argc, char **kargv)
 }
 
 static int
-copy_kargv(struct mm_struct *mm, char **kargv, const char **argv, int max_argc,
+copy_kargv(char **kargv, const char **argv, int max_argc,
 	   int *argc_store)
 {
 	int i, ret = -E_INVAL;
@@ -1060,7 +1058,7 @@ copy_kargv(struct mm_struct *mm, char **kargv, const char **argv, int max_argc,
 	}
 	char *argv_k;
 	for (i = 0; i < max_argc; i++) {
-		if (!copy_from_user(mm, &argv_k, argv + i, sizeof(char *), 0))
+		if (!copy_from_user(&argv_k, argv + i, sizeof(char *), 0))
 			goto failed_cleanup;
 		if (!argv_k)
 			break;
@@ -1068,14 +1066,7 @@ copy_kargv(struct mm_struct *mm, char **kargv, const char **argv, int max_argc,
 		if ((buffer = kmalloc(EXEC_MAX_ARG_LEN + 1)) == NULL) {
 			goto failed_nomem;
 		}
-#if 0
-		if (!copy_from_user(mm, &argv_k, argv + i, sizeof(char *), 0) ||
-		    !copy_string(mm, buffer, argv_k, EXEC_MAX_ARG_LEN + 1)) {
-			kfree(buffer);
-			goto failed_cleanup;
-		}
-#endif
-		if (!copy_string(mm, buffer, argv_k, EXEC_MAX_ARG_LEN + 1)) {
+		if (!copy_string(buffer, argv_k, EXEC_MAX_ARG_LEN + 1)) {
 			kfree(buffer);
 			goto failed_cleanup;
 		}
@@ -1104,49 +1095,17 @@ int do_execve(const char *filename, const char **argv, const char **envp)
 	const char *path;
 
 	int ret = -E_INVAL;
-	lock_mm(mm);
-#if 0
-	if (name == NULL) {
-		snprintf(local_name, sizeof(local_name), "<null> %d",
-			 current->pid);
-	} else {
-		if (!copy_string(mm, local_name, name, sizeof(local_name))) {
-			unlock_mm(mm);
-			return ret;
-		}
-	}
-#endif
 	snprintf(local_name, sizeof(local_name), "<null> %d", current->pid);
 
 	int argc = 0, envc = 0;
-	if ((ret = copy_kargv(mm, kargv, argv, EXEC_MAX_ARG_NUM, &argc)) != 0) {
-		unlock_mm(mm);
+	if ((ret = copy_kargv(kargv, argv, EXEC_MAX_ARG_NUM, &argc)) != 0) {
 		return ret;
 	}
-	if ((ret = copy_kargv(mm, kenvp, envp, EXEC_MAX_ENV_NUM, &envc)) != 0) {
-		unlock_mm(mm);
+	if ((ret = copy_kargv(kenvp, envp, EXEC_MAX_ENV_NUM, &envc)) != 0) {
 		put_kargv(argc, kargv);
 		return ret;
 	}
-#if 0
-	int i;
-	kprintf("## fn %s\n", filename);
-	kprintf("## argc %d\n", argc);
-	for (i = 0; i < argc; i++)
-		kprintf("## %08x %s\n", kargv[i], kargv[i]);
-	kprintf("## envc %d\n", envc);
-	for (i = 0; i < envc; i++)
-		kprintf("## %08x %s\n", kenvp[i], kenvp[i]);
-#endif
-	//path = argv[0];
-	//copy_from_user (mm, &path, argv, sizeof (char*), 0);
 	path = filename;
-	unlock_mm(mm);
-
-	/* linux never do this */
-	//fs_closeall(current->fs_struct);
-
-	/* sysfile_open will check the first argument path, thus we have to use a user-space pointer, and argv[0] may be incorrect */
 
 	int fd;
 	if ((ret = fd = sysfile_open(path, O_RDONLY)) < 0) {
@@ -1221,13 +1180,6 @@ int do_yield(void)
 // NOTE: only after do_wait function, all resources of the child proces are free.
 int do_wait(int pid, int *code_store)
 {
-	struct mm_struct *mm = current->mm;
-	if (code_store != NULL) {
-		if (!user_mem_check(mm, (uintptr_t) code_store, sizeof(int), 1)) {
-			return -E_INVAL;
-		}
-	}
-
 	struct proc_struct *proc;//, *cproc;
 	bool intr_flag, haskid;
 repeat:
@@ -1276,27 +1228,17 @@ found:
 
 	int ret = 0;
 	if (code_store != NULL) {
-		lock_mm(mm);
 		{
-			if (!copy_to_user
-			    (mm, code_store, &exit_code, sizeof(int))) {
+			if (!copy_to_user(code_store, &exit_code, sizeof(int))) {
 				ret = -E_INVAL;
 			}
 		}
-		unlock_mm(mm);
 	}
 	return ret;
 }
 
 int do_linux_waitpid(int pid, int *code_store)
 {
-	struct mm_struct *mm = current->mm;
-	if (code_store != NULL) {
-		if (!user_mem_check(mm, (uintptr_t) code_store, sizeof(int), 1)) {
-			return -E_INVAL;
-		}
-	}
-
 	struct proc_struct *proc, *cproc;
 	bool intr_flag, haskid;
 repeat:
@@ -1359,14 +1301,12 @@ found:
 
 	int ret = 0;
 	if (code_store != NULL) {
-		lock_mm(mm);
 		{
 			int status = exit_code << 8;
-			if (!copy_to_user(mm, code_store, &status, sizeof(int))) {
+			if (!copy_to_user(code_store, &status, sizeof(int))) {
 				ret = -E_INVAL;
 			}
 		}
-		unlock_mm(mm);
 	}
 	return (ret == 0) ? return_pid : ret;
 }
@@ -1410,9 +1350,7 @@ int do_brk(uintptr_t * brk_store)
 
 	uintptr_t brk;
 
-	lock_mm(mm);
-	if (!copy_from_user(mm, &brk, brk_store, sizeof(uintptr_t), 1)) {
-		unlock_mm(mm);
+	if (!copy_from_user(&brk, brk_store, sizeof(uintptr_t), 1)) {
 		return -E_INVAL;
 	}
 
@@ -1438,8 +1376,7 @@ int do_brk(uintptr_t * brk_store)
 	}
 	mm->brk = newbrk;
 out_unlock:
-	copy_to_user(mm, brk_store, &mm->brk, sizeof(uintptr_t));
-	unlock_mm(mm);
+	copy_to_user(brk_store, &mm->brk, sizeof(uintptr_t));
 	return 0;
 }
 
@@ -1453,8 +1390,6 @@ int do_linux_brk(uintptr_t brk)
 	if (!mm) {
 		panic("kernel thread call sys_brk!!.\n");
 	}
-
-	lock_mm(mm);
 
 	min_brk = mm->brk_start;
 
@@ -1484,7 +1419,6 @@ set_brk:
 	mm->brk = brk;
 out_unlock:
 	retval = mm->brk;
-	unlock_mm(mm);
 	return retval;
 }
 
@@ -1514,14 +1448,10 @@ int do_sleep(unsigned int time)
 int do_linux_sleep(const struct linux_timespec __user * req,
 		   struct linux_timespec __user * rem)
 {
-	struct mm_struct *mm = current->mm;
 	struct linux_timespec kts;
-	lock_mm(mm);
-	if (!copy_from_user(mm, &kts, req, sizeof(struct linux_timespec), 1)) {
-		unlock_mm(mm);
+	if (!copy_from_user(&kts, req, sizeof(struct linux_timespec), 1)) {
 		return -E_INVAL;
 	}
-	unlock_mm(mm);
 	long msec = kts.tv_sec * 1000 + kts.tv_nsec / 1000000;
 	if (msec < 0)
 		return -E_INVAL;
@@ -1534,12 +1464,9 @@ int do_linux_sleep(const struct linux_timespec __user * req,
 	int ret = do_sleep(j);
 	if (rem) {
 		memset(&kts, 0, sizeof(struct linux_timespec));
-		lock_mm(mm);
-		if (!copy_to_user(mm, rem, &kts, sizeof(struct linux_timespec))) {
-			unlock_mm(mm);
+		if (!copy_to_user(rem, &kts, sizeof(struct linux_timespec))) {
 			return -E_INVAL;
 		}
-		unlock_mm(mm);
 	}
 	return ret;
 }
@@ -1602,8 +1529,7 @@ int do_mmap(uintptr_t __user * addr_store, size_t len, uint32_t mmap_flags)
 
 	uintptr_t addr;
 
-	lock_mm(mm);
-	if (!copy_from_user(mm, &addr, addr_store, sizeof(uintptr_t), 1)) {
+	if (!copy_from_user(&addr, addr_store, sizeof(uintptr_t), 1)) {
 		goto out_unlock;
 	}
 
@@ -1624,10 +1550,9 @@ int do_mmap(uintptr_t __user * addr_store, size_t len, uint32_t mmap_flags)
 		}
 	}
 	if ((ret = mm_map(mm, addr, len, vm_flags, NULL)) == 0) {
-		copy_to_user(mm, addr_store, &addr, sizeof(uintptr_t));
+		copy_to_user(addr_store, &addr, sizeof(uintptr_t));
 	}
 out_unlock:
-	unlock_mm(mm);
 	return ret;
 }
 
@@ -1642,11 +1567,9 @@ int do_munmap(uintptr_t addr, size_t len)
 		return -E_INVAL;
 	}
 	int ret;
-	lock_mm(mm);
 	{
 		ret = mm_unmap(mm, addr, len);
 	}
-	unlock_mm(mm);
 	return ret;
 }
 
@@ -1842,13 +1765,10 @@ int do_linux_ugetrlimit(int res, struct linux_rlimit *__user __limit)
 	default:
 		return -E_INVAL;
 	}
-	struct mm_struct *mm = current->mm;
-	lock_mm(mm);
 	int ret = 0;
-	if (!copy_to_user(mm, __limit, &limit, sizeof(struct linux_rlimit))) {
+	if (!copy_to_user(__limit, &limit, sizeof(struct linux_rlimit))) {
 		ret = -E_INVAL;
 	}
-	unlock_mm(mm);
 	return ret;
 }
 // cpu_idle - at the end of kern_init, the first kernel thread idleproc will do below works

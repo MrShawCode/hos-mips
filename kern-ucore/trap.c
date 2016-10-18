@@ -139,13 +139,6 @@ static inline int get_error_code(int write, pte_t * pte)
 static int
 pgfault_handler(struct trapframe *tf, uint32_t addr, uint32_t error_code)
 {
-#if 0
-	extern struct mm_struct *check_mm_struct;
-	if (check_mm_struct != NULL) {
-		return do_pgfault(check_mm_struct, error_code, addr);
-	}
-	panic("unhandled page fault.\n");
-#endif
 	extern struct mm_struct *check_mm_struct;
 	struct mm_struct *mm;
 	if (check_mm_struct != NULL) {

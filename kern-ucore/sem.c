@@ -314,11 +314,6 @@ int ipc_sem_get_value(sem_t sem_id, int *value_store)
 		return -E_INVAL;
 	}
 
-	struct mm_struct *mm = current->mm;
-	if (!user_mem_check(mm, (uintptr_t) value_store, sizeof(int), 1)) {
-		return -E_INVAL;
-	}
-
 	sem_undo_t *semu;
 	sem_queue_t *sem_queue = current->sem_queue;
 	down(&(sem_queue->sem));
@@ -328,13 +323,13 @@ int ipc_sem_get_value(sem_t sem_id, int *value_store)
 	int ret = -E_INVAL;
 	if (semu != NULL) {
 		int value = semu->sem->value;
-		lock_mm(mm);
+		
 		{
-			if (copy_to_user(mm, value_store, &value, sizeof(int))) {
+			if (copy_to_user(value_store, &value, sizeof(int))) {
 				ret = 0;
 			}
 		}
-		unlock_mm(mm);
+		
 	}
 	return ret;
 }
