@@ -122,8 +122,6 @@ int do_execve(const char *name, const char **argv, const char **envp);
 int do_yield(void);
 int do_wait(int pid, int *code_store);
 int do_kill(int pid, int error_code);
-int do_brk(uintptr_t * brk_store);
-int do_linux_brk(uintptr_t brk);
 int do_sleep(unsigned int time);
 int do_mmap(uintptr_t * addr_store, size_t len, uint32_t mmap_flags);
 int do_munmap(uintptr_t addr, size_t len);

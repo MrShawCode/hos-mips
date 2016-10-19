@@ -1,6 +1,5 @@
 #include <string.h>
 #include <pmm.h>
-#include <string.h>
 #include <arch.h>
 
 /* *

@@ -17,7 +17,6 @@
 #define SYS_kill            12
 #define SYS_gettime         17
 #define SYS_getpid          18
-#define SYS_brk             19
 #define SYS_mmap            20
 #define SYS_munmap          21
 #define SYS_putc            30

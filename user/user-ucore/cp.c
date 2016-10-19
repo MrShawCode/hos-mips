@@ -6,7 +6,6 @@
 #include <file.h>
 #include <dir.h>
 #include <error.h>
-#include <malloc.h>
 #include <unistd.h>
 
 #define printf(...)                 fprintf(1, __VA_ARGS__)
@@ -32,7 +31,7 @@ int main(int argc, char *argv[])
 		return -E_INVAL;
 	}
 
-	char *buf = (char *)malloc(BUF_SIZE);
+	char buf[BUF_SIZE];
 	if (!buf) {
 		printf("out of memory\n");
 		close(fd1);
@@ -50,6 +49,5 @@ int main(int argc, char *argv[])
 	close(fd1);
 	close(fd2);
 
-	free(buf);
 	return 0;
 }

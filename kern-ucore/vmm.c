@@ -137,7 +137,6 @@ struct mm_struct *mm_create(void)
 		mm->map_count = 0;
 		set_mm_count(mm, 0);
 		mm->locked_by = 0;
-		mm->brk_start = mm->brk = 0;
 		list_init(&(mm->proc_mm_link));
 		sem_init(&(mm->mm_sem), 1);
 		mm->lapic = -1;
@@ -507,31 +506,6 @@ uintptr_t get_unmapped_area(struct mm_struct * mm, size_t len)
 		}
 	}
 	return (start >= USERBASE) ? start : 0;
-}
-
-int mm_brk(struct mm_struct *mm, uintptr_t addr, size_t len)
-{
-	uintptr_t start = ROUNDDOWN(addr, PGSIZE), end =
-	    ROUNDUP(addr + len, PGSIZE);
-	if (!USER_ACCESS(start, end)) {
-		return -E_INVAL;
-	}
-
-	int ret;
-	if ((ret = mm_unmap(mm, start, end - start)) != 0) {
-		return ret;
-	}
-	uint32_t vm_flags = VM_READ | VM_WRITE;
-	struct vma_struct *vma = find_vma(mm, start - 1);
-	if (vma != NULL && vma->vm_end == start && vma->vm_flags == vm_flags) {
-		vma->vm_end = end;
-		return 0;
-	}
-	if ((vma = vma_create(start, end, vm_flags)) == NULL) {
-		return -E_NO_MEM;
-	}
-	insert_vma_struct(mm, vma);
-	return 0;
 }
 
 bool

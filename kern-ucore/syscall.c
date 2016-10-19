@@ -88,12 +88,6 @@ sys_getpid(uint32_t arg[]) {
 }
 
 static uint32_t
-sys_brk(uint32_t arg[]) {
-    uintptr_t *brk_store = (uintptr_t *)arg[0];
-    return do_brk(brk_store);
-}
-
-static uint32_t
 sys_mmap(uint32_t arg[]) {
     uintptr_t *addr_store = (uintptr_t *)arg[0];
     size_t len = (size_t)arg[1];
@@ -306,7 +300,6 @@ static uint32_t (*syscalls[])(uint32_t arg[]) = {
     [SYS_sleep]             sys_sleep,
     [SYS_gettime]           sys_gettime,
     [SYS_getpid]            sys_getpid,
-    [SYS_brk]               sys_brk,
     [SYS_mmap]              sys_mmap,
     [SYS_munmap]            sys_munmap,
     [SYS_putc]              sys_putc,

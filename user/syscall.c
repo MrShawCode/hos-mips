@@ -81,11 +81,6 @@ int sys_getpid(void)
 	return syscall(SYS_getpid);
 }
 
-int sys_brk(uintptr_t * brk_store)
-{
-	return syscall(SYS_brk, brk_store);
-}
-
 int sys_mmap(uintptr_t * addr_store, size_t len, uint32_t mmap_flags)
 {
 	return syscall(SYS_mmap, addr_store, len, mmap_flags);

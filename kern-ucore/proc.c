@@ -339,8 +339,6 @@ static int copy_mm(uint32_t clone_flags, struct proc_struct *proc)
 
 good_mm:
 	if (mm != oldmm) {
-		mm->brk_start = oldmm->brk_start;
-		mm->brk = oldmm->brk;
 		bool intr_flag;
 		local_intr_save(intr_flag);
 		{
@@ -741,15 +739,12 @@ static int load_icode_read(int fd, void *buf, size_t len, off_t offset)
 	return 0;
 }
 
-//#ifdef UCONFIG_BIONIC_LIBC
 static int
-map_ph(int fd, struct proghdr *ph, struct mm_struct *mm, uint32_t * pbias,
-       uint32_t linker)
+map_ph(int fd, struct proghdr *ph, struct mm_struct *mm, uint32_t linker)
 {
 	int ret = 0;
 	struct Page *page;
 	uint32_t vm_flags = 0;
-	uint32_t bias = 0;
 	pte_perm_t perm = 0;
 	ptep_set_u_read(&perm);
 
@@ -763,30 +758,16 @@ map_ph(int fd, struct proghdr *ph, struct mm_struct *mm, uint32_t * pbias,
 	if (vm_flags & VM_WRITE)
 		ptep_set_u_write(&perm);
 
-	if (pbias) {
-		bias = *pbias;
-	}
-	if (!bias && !ph->p_va) {
-		bias = get_unmapped_area(mm, ph->p_memsz + PGSIZE);
-		bias = ROUNDUP(bias, PGSIZE);
-		if (pbias)
-			*pbias = bias;
-	}
-
 	if ((ret =
-	     mm_map(mm, ph->p_va + bias, ph->p_memsz, vm_flags, NULL)) != 0) {
+	     mm_map(mm, ph->p_va, ph->p_memsz, vm_flags, NULL)) != 0) {
 		goto bad_cleanup_mmap;
-	}
-
-	if (!linker && mm->brk_start < ph->p_va + bias + ph->p_memsz) {
-		mm->brk_start = ph->p_va + bias + ph->p_memsz;
 	}
 
 	off_t offset = ph->p_offset;
 	size_t off, size;
-	uintptr_t start = ph->p_va + bias, end, la = ROUNDDOWN(start, PGSIZE);
+	uintptr_t start = ph->p_va , end, la = ROUNDDOWN(start, PGSIZE);
 
-	end = ph->p_va + bias + ph->p_filesz;
+	end = ph->p_va + ph->p_filesz;
 	while (start < end) {
 		if ((page = pgdir_alloc_page(mm->pgdir, la, perm)) == NULL) {
 			ret = -E_NO_MEM;
@@ -804,7 +785,7 @@ map_ph(int fd, struct proghdr *ph, struct mm_struct *mm, uint32_t * pbias,
 		start += size, offset += size;
 	}
 
-	end = ph->p_va + bias + ph->p_memsz;
+	end = ph->p_va + ph->p_memsz;
 
 	if (start < la) {
 		if (start == end) {
@@ -838,8 +819,6 @@ bad_cleanup_mmap:
 	return ret;
 }
 
-//#endif //UCONFIG_BIONIC_LIBC
-
 static int load_icode(int fd, int argc, char **kargv, int envc, char **kenvp)
 {
 	assert(argc >= 0 && argc <= EXEC_MAX_ARG_NUM);
@@ -850,10 +829,6 @@ static int load_icode(int fd, int argc, char **kargv, int envc, char **kenvp)
 
 	int ret = -E_NO_MEM;
 
-//#ifdef UCONFIG_BIONIC_LIBC
-	uint32_t real_entry;
-//#endif //UCONFIG_BIONIC_LIBC
-
 	struct mm_struct *mm;
 	if ((mm = mm_create()) == NULL) {
 		goto bad_mm;
@@ -862,8 +837,6 @@ static int load_icode(int fd, int argc, char **kargv, int envc, char **kenvp)
 	if (setup_pgdir(mm) != 0) {
 		goto bad_pgdir_cleanup_mm;
 	}
-
-	mm->brk_start = 0;
 
 	struct Page *page;
 
@@ -876,32 +849,18 @@ static int load_icode(int fd, int argc, char **kargv, int envc, char **kenvp)
 		ret = -E_INVAL_ELF;
 		goto bad_elf_cleanup_pgdir;
 	}
-//#ifdef UCONFIG_BIONIC_LIBC
-	real_entry = elf->e_entry;
 
 	uint32_t load_address, load_address_flag = 0;
-//#endif //UCONFIG_BIONIC_LIBC
 
 	struct proghdr __ph, *ph = &__ph;
 	uint32_t vm_flags, phnum;
-	pte_perm_t perm = 0;
 
-//#ifdef UCONFIG_BIONIC_LIBC
-	uint32_t is_dynamic = 0, interp_idx;
-	uint32_t bias = 0;
-//#endif //UCONFIG_BIONIC_LIBC
 	for (phnum = 0; phnum < elf->e_phnum; phnum++) {
 		off_t phoff = elf->e_phoff + sizeof(struct proghdr) * phnum;
 		if ((ret =
 		     load_icode_read(fd, ph, sizeof(struct proghdr),
 				     phoff)) != 0) {
 			goto bad_cleanup_mmap;
-		}
-
-		if (ph->p_type == ELF_PT_INTERP) {
-			is_dynamic = 1;
-			interp_idx = phnum;
-			continue;
 		}
 
 		if (ph->p_type != ELF_PT_LOAD) {
@@ -912,22 +871,12 @@ static int load_icode(int fd, int argc, char **kargv, int envc, char **kenvp)
 			goto bad_cleanup_mmap;
 		}
 
-		if (ph->p_va == 0 && !bias) {
-			bias = 0x30800000;
-		}
-
-		if ((ret = map_ph(fd, ph, mm, &bias, 0)) != 0) {
+		if ((ret = map_ph(fd, ph, mm, 0)) != 0) {
 			kprintf("load address: 0x%08x size: %d\n", ph->p_va,
 				ph->p_memsz);
 			goto bad_cleanup_mmap;
 		}
-
-		if (load_address_flag == 0)
-			load_address = ph->p_va + bias;
-		++load_address_flag;
 	}
-
-	mm->brk_start = mm->brk = ROUNDUP(mm->brk_start, PGSIZE);
 
 	/* setup user stack */
 	vm_flags = VM_READ | VM_WRITE | VM_STACK;
@@ -935,77 +884,6 @@ static int load_icode(int fd, int argc, char **kargv, int envc, char **kenvp)
 	     mm_map(mm, USTACKTOP - USTACKSIZE, USTACKSIZE, vm_flags,
 		    NULL)) != 0) {
 		goto bad_cleanup_mmap;
-	}
-
-	if (is_dynamic) {
-		elf->e_entry += bias;
-
-		bias = 0;
-
-		off_t phoff =
-		    elf->e_phoff + sizeof(struct proghdr) * interp_idx;
-		if ((ret =
-		     load_icode_read(fd, ph, sizeof(struct proghdr),
-				     phoff)) != 0) {
-			goto bad_cleanup_mmap;
-		}
-
-		char *interp_path = (char *)kmalloc(ph->p_filesz);
-		load_icode_read(fd, interp_path, ph->p_filesz, ph->p_offset);
-
-		int interp_fd = sysfile_open(interp_path, O_RDONLY);
-		assert(interp_fd >= 0);
-		struct elfhdr interp___elf, *interp_elf = &interp___elf;
-		assert((ret =
-			load_icode_read(interp_fd, interp_elf,
-					sizeof(struct elfhdr), 0)) == 0);
-		assert(interp_elf->e_magic == ELF_MAGIC);
-
-		struct proghdr interp___ph, *interp_ph = &interp___ph;
-		uint32_t interp_phnum;
-		uint32_t va_min = 0xffffffff, va_max = 0;
-		for (interp_phnum = 0; interp_phnum < interp_elf->e_phnum;
-		     ++interp_phnum) {
-			off_t interp_phoff =
-			    interp_elf->e_phoff +
-			    sizeof(struct proghdr) * interp_phnum;
-			assert((ret =
-				load_icode_read(interp_fd, interp_ph,
-						sizeof(struct proghdr),
-						interp_phoff)) == 0);
-			if (interp_ph->p_type != ELF_PT_LOAD) {
-				continue;
-			}
-			if (va_min > interp_ph->p_va)
-				va_min = interp_ph->p_va;
-			if (va_max < interp_ph->p_va + interp_ph->p_memsz)
-				va_max = interp_ph->p_va + interp_ph->p_memsz;
-		}
-
-		bias = get_unmapped_area(mm, va_max - va_min + 1 + PGSIZE);
-		bias = ROUNDUP(bias, PGSIZE);
-
-		for (interp_phnum = 0; interp_phnum < interp_elf->e_phnum;
-		     ++interp_phnum) {
-			off_t interp_phoff =
-			    interp_elf->e_phoff +
-			    sizeof(struct proghdr) * interp_phnum;
-			assert((ret =
-				load_icode_read(interp_fd, interp_ph,
-						sizeof(struct proghdr),
-						interp_phoff)) == 0);
-			if (interp_ph->p_type != ELF_PT_LOAD) {
-				continue;
-			}
-			assert((ret =
-				map_ph(interp_fd, interp_ph, mm, &bias,
-				       1)) == 0);
-		}
-
-		real_entry = interp_elf->e_entry + bias;
-
-		sysfile_close(interp_fd);
-		kfree(interp_path);
 	}
 
 	sysfile_close(fd);
@@ -1022,9 +900,6 @@ static int load_icode(int fd, int argc, char **kargv, int envc, char **kenvp)
 	mm->lapic = pls_read(lapic_id);
 	mp_set_mm_pagetable(mm);
 
-	if (!is_dynamic) {
-		real_entry += bias;
-	}
 	if (init_new_context(current, elf, argc, kargv, envc, kenvp) < 0)
 		goto bad_cleanup_mmap;
 	ret = 0;
@@ -1333,93 +1208,6 @@ int do_kill(int pid, int error_code)
 		return __do_kill(proc, error_code);
 	}
 	return -E_INVAL;
-}
-
-// do_brk - adjust(increase/decrease) the size of process heap, align with page size
-// NOTE: will change the process vma
-int do_brk(uintptr_t * brk_store)
-{
-	struct mm_struct *mm = current->mm;
-	if (mm == NULL) {
-		panic("kernel thread call sys_brk!!.\n");
-	}
-	if (brk_store == NULL) {
-		//     return -E_INVAL;
-		return mm->brk_start;
-	}
-
-	uintptr_t brk;
-
-	if (!copy_from_user(&brk, brk_store, sizeof(uintptr_t), 1)) {
-		return -E_INVAL;
-	}
-
-	if (brk < mm->brk_start) {
-		goto out_unlock;
-	}
-	uintptr_t newbrk = ROUNDUP(brk, PGSIZE), oldbrk = mm->brk;
-	assert(oldbrk % PGSIZE == 0);
-	if (newbrk == oldbrk) {
-		goto out_unlock;
-	}
-	if (newbrk < oldbrk) {
-		if (mm_unmap(mm, newbrk, oldbrk - newbrk) != 0) {
-			goto out_unlock;
-		}
-	} else {
-		if (find_vma_intersection(mm, oldbrk, newbrk + PGSIZE) != NULL) {
-			goto out_unlock;
-		}
-		if (mm_brk(mm, oldbrk, newbrk - oldbrk) != 0) {
-			goto out_unlock;
-		}
-	}
-	mm->brk = newbrk;
-out_unlock:
-	copy_to_user(brk_store, &mm->brk, sizeof(uintptr_t));
-	return 0;
-}
-
-/* poring from linux */
-int do_linux_brk(uintptr_t brk)
-{
-	uint32_t newbrk, oldbrk, retval;
-	struct mm_struct *mm = current->mm;
-	uint32_t min_brk;
-
-	if (!mm) {
-		panic("kernel thread call sys_brk!!.\n");
-	}
-
-	min_brk = mm->brk_start;
-
-	if (brk < min_brk)
-		goto out_unlock;
-
-	newbrk = ROUNDUP(brk, PGSIZE);
-	oldbrk = ROUNDUP(mm->brk, PGSIZE);
-
-	if (oldbrk == newbrk)
-		goto set_brk;
-
-	if (brk <= mm->brk) {
-		if (!mm_unmap(mm, newbrk, oldbrk - newbrk))
-			goto set_brk;
-		goto out_unlock;
-	}
-
-	if (find_vma_intersection(mm, oldbrk, newbrk + PGSIZE))
-		goto out_unlock;
-
-	/* set the brk */
-	if (mm_brk(mm, oldbrk, newbrk - oldbrk))
-		goto out_unlock;
-
-set_brk:
-	mm->brk = brk;
-out_unlock:
-	retval = mm->brk;
-	return retval;
 }
 
 // do_sleep - set current process state to sleep and add timer with "time"
