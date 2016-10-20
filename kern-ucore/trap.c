@@ -139,20 +139,7 @@ static inline int get_error_code(int write, pte_t * pte)
 static int
 pgfault_handler(struct trapframe *tf, uint32_t addr, uint32_t error_code)
 {
-	extern struct mm_struct *check_mm_struct;
-	struct mm_struct *mm;
-	if (check_mm_struct != NULL) {
-		assert(current == idleproc);
-		mm = check_mm_struct;
-	} else {
-		if (current == NULL) {
-			print_trapframe(tf);
-			//print_pgfault(tf);
-			panic("unhandled page fault.\n");
-		}
-		mm = current->mm;
-	}			//kprintf("  (do_pgfault(%x,%d,%x))  ", mm, error_code, addr);
-	return do_pgfault(mm, error_code, addr);
+	return do_pgfault(error_code, addr);
 }
 
 /* use software emulated X86 pgfault */

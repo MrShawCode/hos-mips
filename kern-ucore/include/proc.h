@@ -67,6 +67,7 @@ struct proc_struct {
 	struct proc_signal signal_info;
 
 	void *tls_pointer;
+	pgd_t *pgdir;
 };
 
 struct linux_timespec {

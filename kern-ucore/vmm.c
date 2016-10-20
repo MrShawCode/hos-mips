@@ -657,135 +657,54 @@ int do_madvise(void *addr, size_t len, int advice)
 	return 0;
 }
 
-int do_pgfault(struct mm_struct *mm, machine_word_t error_code, uintptr_t addr)
+int do_pgfault(machine_word_t error_code, uintptr_t addr)
 {
 	struct proc_struct *current = pls_read(current);
-	if (mm == NULL) {
-		assert(current != NULL);
-		/* Chen Yuheng 
-		 * give handler a chance to deal with it 
-		 */
-		kprintf
-		    ("page fault in kernel thread: pid = %d, name = %s, %d %08x.\n",
-		     current->pid, current->name, error_code, addr);
-		return -E_KILLED;
-	}
-
-	bool need_unlock = 1;
-	if (!try_lock_mm(mm)) {
-		if (current != NULL && mm->locked_by == current->pid) {
-			need_unlock = 0;
-		} else {
-			
-		}
-	}
 
 	int ret = -E_INVAL;
-	struct vma_struct *vma = find_vma(mm, addr);
-	if (vma == NULL || vma->vm_start > addr) {
-		goto failed;
-	}
-	if (vma->vm_flags & VM_STACK) {
-		if (addr < vma->vm_start + PGSIZE) {
-			goto failed;
-		}
-	}
-	//kprintf("@ %x %08x\n", vma->vm_flags, vma->vm_start);
-	//assert((vma->vm_flags & VM_IO)==0);
-	if (vma->vm_flags & VM_IO) {
-		ret = -E_INVAL;
-		goto failed;
-	}
-	switch (error_code & 3) {
-	default:
-		/* default is 3: write, present */
-	case 2:		/* write, not present */
-		if (!(vma->vm_flags & VM_WRITE)) {
-			goto failed;
-		}
-		break;
-	case 1:		/* read, present */
-		goto failed;
-	case 0:		/* read, not present */
-		if (!(vma->vm_flags & (VM_READ | VM_EXEC))) {
-			goto failed;
-		}
-	}
+	kprintf("current->pgdir=0x%x\n", current->pgdir);
+
+	assert(error_code == 3);
 
 	pte_perm_t perm, nperm;
 	ptep_unmap(&perm);
 	ptep_set_u_read(&perm);
-	if (vma->vm_flags & VM_WRITE) {
-		ptep_set_u_write(&perm);
-	}
 	addr = ROUNDDOWN(addr, PGSIZE);
 
 	ret = -E_NO_MEM;
 
 	pte_t *ptep;
-	if ((ptep = get_pte(mm->pgdir, addr, 1)) == NULL) {
+	if ((ptep = get_pte(current->pgdir, addr, 1)) == NULL) {
 		goto failed;
 	}
-	if (ptep_invalid(ptep)) {
-		if (!(vma->vm_flags & VM_SHARE)) {
-			if (pgdir_alloc_page(mm->pgdir, addr, perm) == NULL) {
-				goto failed;
-			}
-		} else {
-				panic("NO SWAP\n");
-			}
+	kprintf("ptep = 0x%x\n", *ptep);
+	if (!(*ptep & PTE_COW)) {
+		if (pgdir_alloc_page(current->pgdir, addr, perm) == NULL) {
+			goto failed;
+		}
 	} else {		//a present page, handle copy-on-write (cow) 
 		struct Page *page, *newpage = NULL;
-		bool cow =
-		    ((vma->vm_flags & (VM_SHARE | VM_WRITE)) == VM_WRITE),
-		    may_copy = 1;
-
-#if 1
-		if (!(!ptep_present(ptep)
-		      || ((error_code & 2) && !ptep_u_write(ptep) && cow))) {
-			//assert(PADDR(mm->pgdir) == rcr3());
-			kprintf("%p %p %d %d %x\n", *ptep, addr, error_code,
-				cow, vma->vm_flags);
-			assert(0);
-		}
-#endif
-
-		if (cow) {
+		if (*ptep & PTE_COW & PTE_W) {
 			newpage = alloc_page();
 		}
 		if (ptep_present(ptep)) {
 			page = pte2page(*ptep);
 		} else {
 			assert(0);
-			if (!(error_code & 2) && cow) {
-				ptep_unset_s_write(&perm);
-				may_copy = 0;
-			}
 		}
 
-		if (cow && may_copy) {
-			if (page_ref(page) > 1) {
-				if (newpage == NULL) {
-					goto failed;
-				}
-				memcpy(page2kva(newpage), page2kva(page),
-				       PGSIZE);
-				//kprintf("COW!\n");
-				page = newpage, newpage = NULL;
+		if (page_ref(page) > 1) {
+			if (newpage == NULL) {
+				goto failed;
 			}
+			memcpy(page2kva(newpage), page2kva(page),
+					PGSIZE);
+			page = newpage;
 		}
-		else {
-		}
-		page_insert(mm->pgdir, page, addr, perm);
-		if (newpage != NULL) {
-			free_page(newpage);
-		}
+		page_insert(current->pgdir, page, addr, perm);
 	}
 	ret = 0;
 
 failed:
-	if (need_unlock) {
-		
-	}
 	return ret;
 }

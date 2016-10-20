@@ -122,6 +122,7 @@ struct proc_struct *alloc_proc(void)
 		event_box_init(&(proc->event_box));
 		proc->fs_struct = NULL;
 		proc->sem_queue = sem_queue_create();
+		proc->pgdir = NULL;
 	}
 	return proc;
 }
@@ -215,7 +216,7 @@ void proc_run(struct proc_struct *proc)
 		{
 			pls_write(current, proc);
 			load_rsp0(next->kstack + KSTACKSIZE);
-			mp_set_mm_pagetable(next->mm);
+			mp_set_mm_pagetable(next->pgdir);
 			switch_to(&(prev->context), &(next->context));
 		}
 		local_intr_restore(intr_flag);
@@ -268,7 +269,7 @@ static void put_kstack(struct proc_struct *proc)
 
 // setup_pgdir - alloc one page as PDT
 // XXX, PDT size != PGSIZE!!!
-static int setup_pgdir(struct mm_struct *mm)
+static int setup_pgdir(pgd_t **set_pgdir)
 {
 	struct Page *page;
 	if ((page = alloc_page()) == NULL) {
@@ -277,14 +278,14 @@ static int setup_pgdir(struct mm_struct *mm)
 	pgd_t *pgdir = page2kva(page);
 	memcpy(pgdir, init_pgdir_get(), PGSIZE);
 	map_pgdir(pgdir);
-	mm->pgdir = pgdir;
+	*set_pgdir = pgdir;
 	return 0;
 }
 
 // put_pgdir - free the memory space of PDT
-static void put_pgdir(struct mm_struct *mm)
+static void put_pgdir(pgd_t *pgdir)
 {
-	free_page(kva2page(mm->pgdir));
+	free_page(kva2page(pgdir));
 }
 
 // de_thread - delete this thread "proc" from thread_group list
@@ -304,59 +305,6 @@ static void de_thread(struct proc_struct *proc)
 static struct proc_struct *next_thread(struct proc_struct *proc)
 {
 	return le2proc(list_next(&(proc->thread_group)), thread_group);
-}
-
-// copy_mm - process "proc" duplicate OR share process "current"'s mm according clone_flags
-//         - if clone_flags & CLONE_VM, then "share" ; else "duplicate"
-static int copy_mm(uint32_t clone_flags, struct proc_struct *proc)
-{
-	struct mm_struct *mm, *oldmm = current->mm;
-
-	/* current is a kernel thread */
-	if (oldmm == NULL) {
-		return 0;
-	}
-	if (clone_flags & CLONE_VM) {
-		mm = oldmm;
-		goto good_mm;
-	}
-
-	int ret = -E_NO_MEM;
-	if ((mm = mm_create()) == NULL) {
-		goto bad_mm;
-	}
-	if (setup_pgdir(mm) != 0) {
-		goto bad_pgdir_cleanup_mm;
-	}
-
-	{
-		ret = dup_mmap(mm, oldmm);
-	}
-
-	if (ret != 0) {
-		goto bad_dup_cleanup_mmap;
-	}
-
-good_mm:
-	if (mm != oldmm) {
-		bool intr_flag;
-		local_intr_save(intr_flag);
-		{
-			list_add(&(proc_mm_list), &(mm->proc_mm_link));
-		}
-		local_intr_restore(intr_flag);
-	}
-	mm_count_inc(mm);
-	proc->mm = mm;
-	set_pgdir(proc, mm->pgdir);
-	return 0;
-bad_dup_cleanup_mmap:
-	exit_mmap(mm);
-	put_pgdir(mm);
-bad_pgdir_cleanup_mm:
-	mm_destroy(mm);
-bad_mm:
-	return ret;
 }
 
 static int copy_sem(uint32_t clone_flags, struct proc_struct *proc)
@@ -518,6 +466,23 @@ bad_fs_struct:
 	return ret;
 }
 
+static int copy_pgdir(uint32_t clone_flags, struct proc_struct *proc) {
+	pde_t *old_pgdir = current->pgdir;
+	pde_t *pgdir;
+    /* current is a kernel thread */
+	if(current->pgdir == NULL)
+		return 0;
+
+    int ret = -E_NO_MEM;
+    if (setup_pgdir(&pgdir) != 0)
+		return -1;
+
+    proc->pgdir = pgdir;
+    proc->cr3 = PADDR(pgdir);
+	copy_range(pgdir, old_pgdir, USERBASE, USERTOP, 0);
+	return 0;
+}
+
 static void put_fs(struct proc_struct *proc)
 {
 	struct fs_struct *fs_struct = proc->fs_struct;
@@ -573,14 +538,14 @@ int do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf)
 	if (copy_fs(clone_flags, proc) != 0) {
 		goto bad_fork_cleanup_sem;
 	}
+	if (copy_pgdir(clone_flags, proc) != 0){
+		goto bad_fork_cleanup_proc;
+	}
 	if (copy_signal(clone_flags, proc) != 0) {
 		goto bad_fork_cleanup_fs;
 	}
 	if (copy_sighand(clone_flags, proc) != 0) {
 		goto bad_fork_cleanup_signal;
-	}
-	if (copy_mm(clone_flags, proc) != 0) {
-		goto bad_fork_cleanup_sighand;
 	}
 	if (copy_thread(clone_flags, proc, stack, tf) != 0) {
 		goto bad_fork_cleanup_sighand;
@@ -644,7 +609,7 @@ static int __do_exit(void)
 		mp_set_mm_pagetable(NULL);
 		if (mm_count_dec(mm) == 0) {
 			exit_mmap(mm);
-			put_pgdir(mm);
+			put_pgdir(mm->pgdir);
 			bool intr_flag;
 			local_intr_save(intr_flag);
 			{
@@ -740,28 +705,12 @@ static int load_icode_read(int fd, void *buf, size_t len, off_t offset)
 }
 
 static int
-map_ph(int fd, struct proghdr *ph, struct mm_struct *mm, uint32_t linker)
+map_ph(int fd, struct proghdr *ph,  pde_t *pgdir, uint32_t linker)
 {
 	int ret = 0;
 	struct Page *page;
-	uint32_t vm_flags = 0;
 	pte_perm_t perm = 0;
 	ptep_set_u_read(&perm);
-
-	if (ph->p_flags & ELF_PF_X)
-		vm_flags |= VM_EXEC;
-	if (ph->p_flags & ELF_PF_W)
-		vm_flags |= VM_WRITE;
-	if (ph->p_flags & ELF_PF_R)
-		vm_flags |= VM_READ;
-
-	if (vm_flags & VM_WRITE)
-		ptep_set_u_write(&perm);
-
-	if ((ret =
-	     mm_map(mm, ph->p_va, ph->p_memsz, vm_flags, NULL)) != 0) {
-		goto bad_cleanup_mmap;
-	}
 
 	off_t offset = ph->p_offset;
 	size_t off, size;
@@ -769,7 +718,7 @@ map_ph(int fd, struct proghdr *ph, struct mm_struct *mm, uint32_t linker)
 
 	end = ph->p_va + ph->p_filesz;
 	while (start < end) {
-		if ((page = pgdir_alloc_page(mm->pgdir, la, perm)) == NULL) {
+		if ((page = pgdir_alloc_page(pgdir, la, perm)) == NULL) {
 			ret = -E_NO_MEM;
 			goto bad_cleanup_mmap;
 		}
@@ -802,7 +751,7 @@ map_ph(int fd, struct proghdr *ph, struct mm_struct *mm, uint32_t linker)
 	}
 
 	while (start < end) {
-		if ((page = pgdir_alloc_page(mm->pgdir, la, perm)) == NULL) {
+		if ((page = pgdir_alloc_page(pgdir, la, perm)) == NULL) {
 			ret = -E_NO_MEM;
 			goto bad_cleanup_mmap;
 		}
@@ -829,12 +778,7 @@ static int load_icode(int fd, int argc, char **kargv, int envc, char **kenvp)
 
 	int ret = -E_NO_MEM;
 
-	struct mm_struct *mm;
-	if ((mm = mm_create()) == NULL) {
-		goto bad_mm;
-	}
-
-	if (setup_pgdir(mm) != 0) {
+	if (setup_pgdir(&current->pgdir) != 0) {
 		goto bad_pgdir_cleanup_mm;
 	}
 
@@ -871,46 +815,101 @@ static int load_icode(int fd, int argc, char **kargv, int envc, char **kenvp)
 			goto bad_cleanup_mmap;
 		}
 
-		if ((ret = map_ph(fd, ph, mm, 0)) != 0) {
+		if ((ret = map_ph(fd, ph, current->pgdir, 0)) != 0) {
 			kprintf("load address: 0x%08x size: %d\n", ph->p_va,
 				ph->p_memsz);
 			goto bad_cleanup_mmap;
 		}
-	}
+		        off_t offset = ph->p_offset;
+        size_t off, size;
+        uintptr_t start = ph->p_va, end, la = ROUNDDOWN(start, PGSIZE);
 
-	/* setup user stack */
-	vm_flags = VM_READ | VM_WRITE | VM_STACK;
-	if ((ret =
-	     mm_map(mm, USTACKTOP - USTACKSIZE, USTACKSIZE, vm_flags,
-		    NULL)) != 0) {
-		goto bad_cleanup_mmap;
-	}
+        ret = -E_NO_MEM;
+		uint32_t perm = PTE_U;
+		if (ph->p_flags & ELF_PF_W)
+			perm |= PTE_W;
+        end = ph->p_va + ph->p_filesz;
+        while (start < end) {
+            if ((page = pgdir_alloc_page(current->pgdir, la, perm)) == NULL) {
+                ret = -E_NO_MEM;
+                goto bad_cleanup_mmap;
+            }
+            off = start - la, size = PGSIZE - off, la += PGSIZE;
+            if (end < la) {
+                size -= la - end;
+            }
+            if ((ret = load_icode_read(fd, page2kva(page) + off, size, offset)) != 0) {
+                goto bad_cleanup_mmap;
+            }
+            start += size, offset += size;
+        }
+        end = ph->p_va + ph->p_memsz;
 
+        if (start < la) {
+            /* ph->p_memsz == ph->p_filesz */
+            if (start == end) {
+                continue ;
+            }
+            off = start + PGSIZE - la, size = PGSIZE - off;
+            if (end < la) {
+                size -= la - end;
+            }
+            memset(page2kva(page) + off, 0, size);
+            start += size;
+            assert((end < la && start == end) || (end >= la && start == la));
+        }
+        while (start < end) {
+            if ((page = pgdir_alloc_page(current->pgdir, la, perm)) == NULL) {
+                ret = -E_NO_MEM;
+                goto bad_cleanup_mmap;
+            }
+            off = start - la, size = PGSIZE - off, la += PGSIZE;
+            if (end < la) {
+                size -= la - end;
+            }
+            memset(page2kva(page) + off, 0, size);
+            start += size;
+        }
+	}
 	sysfile_close(fd);
 
-	bool intr_flag;
-	local_intr_save(intr_flag);
-	{
-		list_add(&(proc_mm_list), &(mm->proc_mm_link));
+	/* setup user stack */
+	uintptr_t i = ROUNDDOWN(USTACKTOP - USTACKSIZE, PGSIZE);
+	for(;i < ROUNDUP(USTACKTOP - USTACKSIZE + USTACKSIZE, PGSIZE);i+=PGSIZE){
+		assert(pgdir_alloc_page(current->pgdir, i, PTE_USER) != NULL);
 	}
-	local_intr_restore(intr_flag);
-	mm_count_inc(mm);
-	current->mm = mm;
-	set_pgdir(current, mm->pgdir);
-	mm->lapic = pls_read(lapic_id);
-	mp_set_mm_pagetable(mm);
 
-	if (init_new_context(current, elf, argc, kargv, envc, kenvp) < 0)
-		goto bad_cleanup_mmap;
+	set_pgdir(current, current->pgdir);
+	lcr3(PADDR(current->pgdir));
+
+	uintptr_t stacktop = USTACKTOP - argc * PGSIZE;
+	char **uargv = (char **)(stacktop - argc * sizeof(char *));
+	kprintf("stacktop:0x%x\n", stacktop);
+	kprintf("current->pgdir=0x%x\n", current->pgdir);
+	for (i = 0; i < argc; i++) {
+		uargv[i] = strcpy((char *)(stacktop + i * PGSIZE), kargv[i]);
+	}
+	struct trapframe *tf = current->tf;
+	memset(tf, 0, sizeof(struct trapframe));
+	tf->tf_epc = elf->e_entry;
+	tf->tf_regs.reg_r[MIPS_REG_SP] = USTACKTOP;
+	uint32_t status = read_c0_status();
+	status &= ~ST0_KSU;
+	status |= KSU_USER;
+	status |= ST0_EXL;
+	tf->tf_status = status;
+	tf->tf_regs.reg_r[MIPS_REG_A0] = argc;
+	tf->tf_regs.reg_r[MIPS_REG_A1] = (uint32_t) uargv;
+
 	ret = 0;
 out:
 	return ret;
 bad_cleanup_mmap:
-	exit_mmap(mm);
+	// exit_mmap(mm);
 bad_elf_cleanup_pgdir:
-	put_pgdir(mm);
+	put_pgdir(current->pgdir);
 bad_pgdir_cleanup_mm:
-	mm_destroy(mm);
+	// mm_destroy(mm);
 bad_mm:
 	goto out;
 }
@@ -961,8 +960,6 @@ int do_execve(const char *filename, const char **argv, const char **envp)
 {
 	static_assert(EXEC_MAX_ARG_LEN >= FS_MAX_FPATH_LEN);
 
-	struct mm_struct *mm = current->mm;
-
 	char local_name[PROC_NAME_LEN + 1];
 	memset(local_name, 0, sizeof(local_name));
 
@@ -987,22 +984,6 @@ int do_execve(const char *filename, const char **argv, const char **envp)
 		goto execve_exit;
 	}
 
-	if (mm != NULL) {
-		mm->lapic = -1;
-		mp_set_mm_pagetable(NULL);
-		if (mm_count_dec(mm) == 0) {
-			exit_mmap(mm);
-			put_pgdir(mm);
-			bool intr_flag;
-			local_intr_save(intr_flag);
-			{
-				list_del(&(mm->proc_mm_link));
-			}
-			local_intr_restore(intr_flag);
-			mm_destroy(mm);
-		}
-		current->mm = NULL;
-	}
 	put_sem_queue(current);
 
 	ret = -E_NO_MEM;
@@ -1591,33 +1572,6 @@ copy_thread(uint32_t clone_flags, struct proc_struct *proc, uintptr_t esp,
 	proc->tf->tf_regs.reg_r[MIPS_REG_SP] = esp;
 	proc->context.sf_ra = (uintptr_t) forkret;
 	proc->context.sf_sp = (uintptr_t) (proc->tf) - 32;
-	return 0;
-}
-
-int init_new_context(struct proc_struct *proc, struct elfhdr *elf,
-		 int argc, char **kargv, int envc, char **kenvp)
-{
-
-	uintptr_t stacktop = USTACKTOP - argc * PGSIZE;
-	char **uargv = (char **)(stacktop - argc * sizeof(char *));
-	int i;
-	for (i = 0; i < argc; i++) {
-		uargv[i] = strcpy((char *)(stacktop + i * PGSIZE), kargv[i]);
-	}
-	//stacktop = (uintptr_t)uargv - sizeof(int);
-	//*(int *)stacktop = argc;
-	struct trapframe *tf = proc->tf;
-	memset(tf, 0, sizeof(struct trapframe));
-	tf->tf_epc = elf->e_entry;
-	tf->tf_regs.reg_r[MIPS_REG_SP] = USTACKTOP;
-	uint32_t status = read_c0_status();
-	status &= ~ST0_KSU;
-	status |= KSU_USER;
-	status |= ST0_EXL;
-	tf->tf_status = status;
-	tf->tf_regs.reg_r[MIPS_REG_A0] = argc;
-	tf->tf_regs.reg_r[MIPS_REG_A1] = (uint32_t) uargv;
-
 	return 0;
 }
 

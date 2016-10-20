@@ -6,10 +6,10 @@
 PLS int pls_lapic_id;
 PLS int pls_lcpu_idx;
 PLS int pls_lcpu_count;
-void mp_set_mm_pagetable(struct mm_struct *mm)
+void mp_set_mm_pagetable(pgd_t *pgdir)
 {
-	if (mm != NULL && mm->pgdir != NULL)
-		lcr3(PADDR(mm->pgdir));
+	if (pgdir != NULL)
+		lcr3(PADDR(pgdir));
 	else
 		lcr3(boot_cr3);
 	tlb_invalidate_all();

@@ -61,7 +61,7 @@
 #define PTE_AVAIL       0xE00	// Available for software use
 						// The PTE_AVAIL bits aren't used by the kernel or interpreted by the
 						// hardware, so user processes are allowed to set them arbitrarily.
-
+#define PTE_COW			0x800
 #define PTE_USER        (PTE_U | PTE_W | PTE_P)
 
 //added by HHL

@@ -98,7 +98,7 @@ int dup_mmap(struct mm_struct *to, struct mm_struct *from);
 void exit_mmap(struct mm_struct *mm);
 uintptr_t get_unmapped_area(struct mm_struct *mm, size_t len);
 
-int do_pgfault(struct mm_struct *mm, machine_word_t error_code, uintptr_t addr);
+int do_pgfault(machine_word_t error_code, uintptr_t addr);
 bool user_mem_check(struct mm_struct *mm, uintptr_t start, size_t len,
 		    bool write);
 
