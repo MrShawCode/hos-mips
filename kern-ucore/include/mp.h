@@ -30,8 +30,6 @@ extern volatile int mpti_end;
 
 int mp_init(void);
 
-struct mm_struct;
-
 void kern_enter(int source);
 void kern_leave(void);
 void mp_set_mm_pagetable(pgd_t * pgdir);

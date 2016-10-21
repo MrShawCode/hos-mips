@@ -393,3 +393,24 @@ char *stradd(const char *src1, const char *src2)
 	}
 	return ret;
 }
+
+bool copy_string(char *dst, const char *src, size_t maxn)
+{
+	size_t alen, part =
+	    ROUNDDOWN_2N((uintptr_t) src + PGSIZE, PGSHIFT) - (uintptr_t) src;
+	while (1) {
+		if (part > maxn) {
+			part = maxn;
+		}
+		if ((alen = strnlen(src, part)) < part) {
+			memcpy(dst, src, alen + 1);
+			return 1;
+		}
+		if (part == maxn) {
+			return 0;
+		}
+		memcpy(dst, src, part);
+		dst += part, src += part, maxn -= part;
+		part = PGSIZE;
+	}
+}

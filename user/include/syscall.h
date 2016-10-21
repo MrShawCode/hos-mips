@@ -15,8 +15,6 @@ int sys_sleep(unsigned int time);
 int sys_kill(int pid);
 size_t sys_gettime(void);
 int sys_getpid(void);
-int sys_mmap(uintptr_t * addr_store, size_t len, uint32_t mmap_flags);
-int sys_munmap(uintptr_t addr, size_t len);
 int sys_putc(int c);
 int sys_pgdir(void);
 sem_t sys_sem_init(int value);
@@ -70,8 +68,6 @@ int sys_mount(const char *source, const char *target,
 int sys_umount(const char *target);
 
 int sys_ioctl(int d, int request, unsigned long data);
-
-void *sys_linux_mmap(void *addr, size_t length, int fd, size_t offset);
 
 int sys_rf212_send(uint8_t len, uint8_t * data);
 int sys_rf212_reg(uint8_t reg, uint8_t value);

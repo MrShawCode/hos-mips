@@ -74,16 +74,6 @@ void print_pgdir(void)
 	sys_pgdir();
 }
 
-int mmap(uintptr_t * addr_store, size_t len, uint32_t mmap_flags)
-{
-	return sys_mmap(addr_store, len, mmap_flags);
-}
-
-int munmap(uintptr_t addr, size_t len)
-{
-	return sys_munmap(addr, len);
-}
-
 sem_t sem_init(int value)
 {
 	return sys_sem_init(value);

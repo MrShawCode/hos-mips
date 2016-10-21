@@ -88,21 +88,6 @@ sys_getpid(uint32_t arg[]) {
 }
 
 static uint32_t
-sys_mmap(uint32_t arg[]) {
-    uintptr_t *addr_store = (uintptr_t *)arg[0];
-    size_t len = (size_t)arg[1];
-    uint32_t mmap_flags = (uint32_t)arg[2];
-    return do_mmap(addr_store, len, mmap_flags);
-}
-
-static uint32_t
-sys_munmap(uint32_t arg[]) {
-    uintptr_t addr = (uintptr_t)arg[0];
-    size_t len = (size_t)arg[1];
-    return do_munmap(addr, len);
-}
-
-static uint32_t
 sys_putc(uint32_t arg[]) {
     int c = (int)arg[0];
     kputchar(c);
@@ -300,8 +285,6 @@ static uint32_t (*syscalls[])(uint32_t arg[]) = {
     [SYS_sleep]             sys_sleep,
     [SYS_gettime]           sys_gettime,
     [SYS_getpid]            sys_getpid,
-    [SYS_mmap]              sys_mmap,
-    [SYS_munmap]            sys_munmap,
     [SYS_putc]              sys_putc,
     [SYS_pgdir]             sys_pgdir,
     [SYS_sem_init]          sys_sem_init,

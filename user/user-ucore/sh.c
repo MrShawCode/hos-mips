@@ -238,10 +238,8 @@ int main(int argc, char **argv)
 			ret = runcmd(buffer);
 			exit(ret);
 		}
-		printf("pid:%d\n", pid);
 		assert(pid >= 0);
 		if (waitpid(pid, &ret) == 0) {
-			printf("get here\n");
 			if (ret == 0 && shcwd[0] != '\0') {
 				ret = chdir(shcwd);
 			}

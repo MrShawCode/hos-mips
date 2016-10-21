@@ -5,7 +5,6 @@
 #include <error.h>
 #include <sched.h>
 #include <elf.h>
-#include <vmm.h>
 #include <trap.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -81,8 +80,6 @@ struct proc_struct *initproc;
 
 // the process set's list
 list_entry_t proc_list;
-// the process set's mm's list
-list_entry_t proc_mm_list;
 
 #define HASH_SHIFT          10
 #define HASH_LIST_SIZE      (1 << HASH_SHIFT)
@@ -106,7 +103,6 @@ struct proc_struct *alloc_proc(void)
 		proc->kstack = 0;
 		proc->need_resched = 0;
 		proc->parent = NULL;
-		proc->mm = NULL;
 		proc->tf = NULL;
 		proc->flags = 0;
 		proc->need_resched = 0;
@@ -603,22 +599,11 @@ static int __do_exit(void)
 		panic("initproc exit.\n");
 	}
 
-	struct mm_struct *mm = current->mm;
-	if (mm != NULL) {
-		mm->lapic = -1;
+	struct pde_t *pgdir = current->pgdir;
+	if (pgdir != NULL) {
 		mp_set_mm_pagetable(NULL);
-		if (mm_count_dec(mm) == 0) {
-			exit_mmap(mm);
-			put_pgdir(mm->pgdir);
-			bool intr_flag;
-			local_intr_save(intr_flag);
-			{
-				list_del(&(mm->proc_mm_link));
-			}
-			local_intr_restore(intr_flag);
-			mm_destroy(mm);
-		}
-		current->mm = NULL;
+		put_pgdir(pgdir);
+		current->pgdir = NULL;
 	}
 	put_sighand(current);
 	put_signal(current);
@@ -772,9 +757,9 @@ static int load_icode(int fd, int argc, char **kargv, int envc, char **kenvp)
 {
 	assert(argc >= 0 && argc <= EXEC_MAX_ARG_NUM);
 	assert(envc >= 0 && envc <= EXEC_MAX_ENV_NUM);
-	if (current->mm != NULL) {
-		panic("load_icode: current->mm must be empty.\n");
-	}
+	// if (current->pgdir != NULL) {
+	// 	panic("load_icode: current->pgdir must be empty.\n");
+	// }
 
 	int ret = -E_NO_MEM;
 
@@ -884,8 +869,6 @@ static int load_icode(int fd, int argc, char **kargv, int envc, char **kenvp)
 
 	uintptr_t stacktop = USTACKTOP - argc * PGSIZE;
 	char **uargv = (char **)(stacktop - argc * sizeof(char *));
-	kprintf("stacktop:0x%x\n", stacktop);
-	kprintf("current->pgdir=0x%x\n", current->pgdir);
 	for (i = 0; i < argc; i++) {
 		uargv[i] = strcpy((char *)(stacktop + i * PGSIZE), kargv[i]);
 	}
@@ -905,11 +888,9 @@ static int load_icode(int fd, int argc, char **kargv, int envc, char **kenvp)
 out:
 	return ret;
 bad_cleanup_mmap:
-	// exit_mmap(mm);
 bad_elf_cleanup_pgdir:
 	put_pgdir(current->pgdir);
 bad_pgdir_cleanup_mm:
-	// mm_destroy(mm);
 bad_mm:
 	goto out;
 }
@@ -932,7 +913,7 @@ copy_kargv(char **kargv, const char **argv, int max_argc,
 	}
 	char *argv_k;
 	for (i = 0; i < max_argc; i++) {
-		if (!copy_from_user(&argv_k, argv + i, sizeof(char *), 0))
+		if (!memcpy(&argv_k, argv + i, sizeof(char *)))
 			goto failed_cleanup;
 		if (!argv_k)
 			break;
@@ -1085,7 +1066,7 @@ found:
 	int ret = 0;
 	if (code_store != NULL) {
 		{
-			if (!copy_to_user(code_store, &exit_code, sizeof(int))) {
+			if (!memcpy(code_store, &exit_code, sizeof(int))) {
 				ret = -E_INVAL;
 			}
 		}
@@ -1159,7 +1140,7 @@ found:
 	if (code_store != NULL) {
 		{
 			int status = exit_code << 8;
-			if (!copy_to_user(code_store, &status, sizeof(int))) {
+			if (!memcpy(code_store, &status, sizeof(int))) {
 				ret = -E_INVAL;
 			}
 		}
@@ -1218,7 +1199,7 @@ int do_linux_sleep(const struct linux_timespec __user * req,
 		   struct linux_timespec __user * rem)
 {
 	struct linux_timespec kts;
-	if (!copy_from_user(&kts, req, sizeof(struct linux_timespec), 1)) {
+	if (!memcpy(&kts, req, sizeof(struct linux_timespec))) {
 		return -E_INVAL;
 	}
 	long msec = kts.tv_sec * 1000 + kts.tv_nsec / 1000000;
@@ -1233,111 +1214,9 @@ int do_linux_sleep(const struct linux_timespec __user * req,
 	int ret = do_sleep(j);
 	if (rem) {
 		memset(&kts, 0, sizeof(struct linux_timespec));
-		if (!copy_to_user(rem, &kts, sizeof(struct linux_timespec))) {
+		if (!memcpy(rem, &kts, sizeof(struct linux_timespec))) {
 			return -E_INVAL;
 		}
-	}
-	return ret;
-}
-
-int
-__do_linux_mmap(uintptr_t __user * addr_store, size_t len, uint32_t mmap_flags)
-{
-	struct mm_struct *mm = current->mm;
-	if (mm == NULL) {
-		panic("kernel thread call mmap!!.\n");
-	}
-	if (addr_store == NULL || len == 0) {
-		return -E_INVAL;
-	}
-
-	int ret = -E_INVAL;
-
-	uintptr_t addr;
-	addr = *addr_store;
-
-	uintptr_t start = ROUNDDOWN(addr, PGSIZE), end =
-	    ROUNDUP(addr + len, PGSIZE);
-	addr = start, len = end - start;
-
-	uint32_t vm_flags = VM_READ;
-
-	/* set anonymous flag */
-	vm_flags |= VM_ANONYMOUS;
-
-	if (mmap_flags & MMAP_WRITE)
-		vm_flags |= VM_WRITE;
-	if (mmap_flags & MMAP_STACK)
-		vm_flags |= VM_STACK;
-
-	ret = -E_NO_MEM;
-	if (addr == 0) {
-		if ((addr = get_unmapped_area(mm, len)) == 0) {
-			goto out_unlock;
-		}
-	}
-	if ((ret = mm_map(mm, addr, len, vm_flags, NULL)) == 0) {
-		*addr_store = addr;
-	}
-out_unlock:
-	return ret;
-}
-
-// do_mmap - add a vma with addr, len and flags(VM_READ/M_WRITE/VM_STACK)
-int do_mmap(uintptr_t __user * addr_store, size_t len, uint32_t mmap_flags)
-{
-	struct mm_struct *mm = current->mm;
-	if (mm == NULL) {
-		panic("kernel thread call mmap!!.\n");
-	}
-	if (addr_store == NULL || len == 0) {
-		return -E_INVAL;
-	}
-
-	int ret = -E_INVAL;
-
-	uintptr_t addr;
-
-	if (!copy_from_user(&addr, addr_store, sizeof(uintptr_t), 1)) {
-		goto out_unlock;
-	}
-
-	uintptr_t start = ROUNDDOWN(addr, PGSIZE), end =
-	    ROUNDUP(addr + len, PGSIZE);
-	addr = start, len = end - start;
-
-	uint32_t vm_flags = VM_READ;
-	if (mmap_flags & MMAP_WRITE)
-		vm_flags |= VM_WRITE;
-	if (mmap_flags & MMAP_STACK)
-		vm_flags |= VM_STACK;
-
-	ret = -E_NO_MEM;
-	if (addr == 0) {
-		if ((addr = get_unmapped_area(mm, len)) == 0) {
-			goto out_unlock;
-		}
-	}
-	if ((ret = mm_map(mm, addr, len, vm_flags, NULL)) == 0) {
-		copy_to_user(addr_store, &addr, sizeof(uintptr_t));
-	}
-out_unlock:
-	return ret;
-}
-
-// do_munmap - delete vma with addr & len
-int do_munmap(uintptr_t addr, size_t len)
-{
-	struct mm_struct *mm = current->mm;
-	if (mm == NULL) {
-		panic("kernel thread call munmap!!.\n");
-	}
-	if (len == 0) {
-		return -E_INVAL;
-	}
-	int ret;
-	{
-		ret = mm_unmap(mm, addr, len);
 	}
 	return ret;
 }
@@ -1450,7 +1329,6 @@ void proc_init(void)
 	int lcpu_count = pls_read(lcpu_count);
 
 	list_init(&proc_list);
-	list_init(&proc_mm_list);
 	for (i = 0; i < HASH_LIST_SIZE; i++) {
 		list_init(hash_list + i);
 	}
@@ -1535,7 +1413,7 @@ int do_linux_ugetrlimit(int res, struct linux_rlimit *__user __limit)
 		return -E_INVAL;
 	}
 	int ret = 0;
-	if (!copy_to_user(__limit, &limit, sizeof(struct linux_rlimit))) {
+	if (!memcpy(__limit, &limit, sizeof(struct linux_rlimit))) {
 		ret = -E_INVAL;
 	}
 	return ret;

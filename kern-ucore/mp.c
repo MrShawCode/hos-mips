@@ -1,7 +1,6 @@
 #include <mp.h>
 #include <proc.h>
 #include <pmm.h>
-#include <vmm.h>
 
 PLS int pls_lapic_id;
 PLS int pls_lcpu_idx;

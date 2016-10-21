@@ -1,5 +1,4 @@
 #include "linux_misc_struct.h"
-#include <vmm.h>
 #include <proc.h>
 #include <string.h>
 
@@ -11,7 +10,7 @@ int ucore_gettimeofday(struct linux_timeval __user * tv,
 	ktv.tv_sec = ticks / 100;
 	ktv.tv_usec = (ticks % 100) * 10000;
 	
-	if (!copy_to_user(tv, &ktv, sizeof(struct linux_timeval))) {
+	if (!memcpy(tv, &ktv, sizeof(struct linux_timeval))) {
 		
 		return -1;
 	}
@@ -20,7 +19,7 @@ int ucore_gettimeofday(struct linux_timeval __user * tv,
 		struct linux_timezone ktz;
 		memset(&ktz, 0, sizeof(struct linux_timezone));
 		
-		if (!copy_to_user(tz, &ktz, sizeof(struct linux_timezone))) {
+		if (!memcpy(tz, &ktz, sizeof(struct linux_timezone))) {
 			
 			return -1;
 		}
@@ -35,7 +34,7 @@ int do_clock_gettime(struct linux_timespec __user * time)
 	ktv.tv_sec = ticks / 100;
 	ktv.tv_nsec = (ticks % 100) * 10000000;
 	
-	if (!copy_to_user(time, &ktv, sizeof(struct linux_timespec))) {
+	if (!memcpy(time, &ktv, sizeof(struct linux_timespec))) {
 		
 		return -1;
 	}

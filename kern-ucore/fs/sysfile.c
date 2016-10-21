@@ -1,7 +1,6 @@
 #include <types.h>
 #include <string.h>
 #include <pmm.h>
-#include <vmm.h>
 #include <proc.h>
 #include <vfs.h>
 #include <file.h>
@@ -83,7 +82,7 @@ int sysfile_read(int fd, void *base, size_t len)
 		if (alen != 0) {
 			
 			{
-				if (copy_to_user(base, buffer, alen)) {
+				if (memcpy(base, buffer, alen)) {
 					assert(len >= alen);
 					base += alen, len -= alen, copied +=
 					    alen;
@@ -136,10 +135,8 @@ int sysfile_write(int fd, void *base, size_t len)
 			alen = len;
 		}
 		
-		{
-			if (!copy_from_user(buffer, base, alen, 0)) {
-				ret = -E_INVAL;
-			}
+		if (!memcpy(buffer, base, alen)) {
+			ret = -E_INVAL;
 		}
 		
 		if (ret == 0) {
@@ -172,9 +169,8 @@ int sysfile_writev(int fd, struct iovec __user * iov, int iovcnt)
 		char *pbase;
 		size_t plen;
 
-		copy_from_user(&pbase, &(iov[i].iov_base), sizeof(char *),
-			       0);
-		copy_from_user(&plen, &(iov[i].iov_len), sizeof(size_t), 0);
+		memcpy(&pbase, &(iov[i].iov_base), sizeof(char *));
+		memcpy(&plen, &(iov[i].iov_len), sizeof(size_t));
 
 		rcode = sysfile_write(fd, pbase, plen);
 		if (rcode < 0)
@@ -200,7 +196,7 @@ int sysfile_fstat(int fd, struct stat *__stat)
 		return ret;
 	}
 
-	if (!copy_to_user(__stat, stat, sizeof(struct stat))) {
+	if (!memcpy(__stat, stat, sizeof(struct stat))) {
 		ret = -E_INVAL;
 	}
 
@@ -230,7 +226,7 @@ int sysfile_linux_fstat(int fd, struct linux_stat __user * buf)
 	ret = 0;
 	
 	{
-		if (!copy_to_user(buf, kls, sizeof(struct linux_stat))) {
+		if (!memcpy(buf, kls, sizeof(struct linux_stat))) {
 			ret = -1;
 		}
 	}
@@ -262,7 +258,7 @@ int sysfile_linux_fstat64(int fd, struct linux_stat64 __user * buf)
 	ret = 0;
 	
 	{
-		if (!copy_to_user(buf, kls, sizeof(struct linux_stat64))) {
+		if (!memcpy(buf, kls, sizeof(struct linux_stat64))) {
 			ret = -1;
 		}
 	}
@@ -396,8 +392,8 @@ int sysfile_getdirentry(int fd, struct dirent *__direntp, uint32_t * len_store)
 
 	int ret = 0;
 	
-	if (!copy_from_user(&(direntp->d_off), &(__direntp->d_off),
-			sizeof(direntp->d_off), 1)) {
+	if (!memcpy(&(direntp->d_off), &(__direntp->d_off),
+			sizeof(direntp->d_off))) {
 		ret = -E_INVAL;
 	}
 	
@@ -406,7 +402,7 @@ int sysfile_getdirentry(int fd, struct dirent *__direntp, uint32_t * len_store)
 		goto out;
 	}
 
-	if (!copy_to_user(__direntp, direntp, sizeof(struct dirent))) {
+	if (!memcpy(__direntp, direntp, sizeof(struct dirent))) {
 		ret = -E_INVAL;
 	}
 	
@@ -429,7 +425,7 @@ int sysfile_pipe(int *fd_store)
 	if ((ret = file_pipe(fd)) == 0) {
 		
 		{
-			if (!copy_to_user(fd_store, fd, sizeof(fd))) {
+			if (!memcpy(fd_store, fd, sizeof(fd))) {
 				ret = -E_INVAL;
 			}
 		}
@@ -462,16 +458,4 @@ int sysfile_ioctl(int fd, unsigned int cmd, unsigned long arg)
 		return -E_INVAL;
 	}
 	return linux_devfile_ioctl(fd, cmd, arg);
-}
-
-void *sysfile_linux_mmap2(void *addr, size_t len, int prot, int flags,
-			  int fd, size_t pgoff)
-{
-	if (!file_testfd(fd, 1, 0)) {
-		return MAP_FAILED;
-	}
-	if (__is_linux_devfile(fd)) {
-		return linux_devfile_mmap2(addr, len, prot, flags, fd, pgoff);
-	}
-	return MAP_FAILED;
 }

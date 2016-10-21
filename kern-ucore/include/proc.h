@@ -28,7 +28,6 @@ enum proc_state {
 #define MAX_PID                     (MAX_PROCESS * 2)
 
 extern list_entry_t proc_list;
-extern list_entry_t proc_mm_list;
 
 struct inode;
 struct fs_struct;
@@ -42,7 +41,6 @@ struct proc_struct {
 	uintptr_t kstack;	// Process kernel stack
 	volatile bool need_resched;	// bool value: need to be rescheduled to release CPU?
 	struct proc_struct *parent;	// the parent process
-	struct mm_struct *mm;	// Process's memory management field
 	struct context context;	// Switch here to run process
 	struct trapframe *tf;	// Trap frame for current interrupt
 	uintptr_t cr3;		// CR3 register: the base addr of Page Directroy Table(PDT)
@@ -124,8 +122,6 @@ int do_yield(void);
 int do_wait(int pid, int *code_store);
 int do_kill(int pid, int error_code);
 int do_sleep(unsigned int time);
-int do_mmap(uintptr_t * addr_store, size_t len, uint32_t mmap_flags);
-int do_munmap(uintptr_t addr, size_t len);
 int do_linux_waitpid(int pid, int *code_store);
 
 /* Implemented by archs */

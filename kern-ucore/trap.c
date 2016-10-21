@@ -311,3 +311,35 @@ int ucore_in_interrupt()
 	//panic("ucore_in_interrupt()");
 	return 0;
 }
+
+int do_pgfault(machine_word_t error_code, uintptr_t addr)
+{
+	struct proc_struct *current = pls_read(current);
+
+	int ret = -E_INVAL;
+
+	assert(error_code == 3);
+
+	pte_perm_t perm, nperm;
+	ptep_unmap(&perm);
+	ptep_set_u_read(&perm);
+	addr = ROUNDDOWN(addr, PGSIZE);
+
+	ret = -E_NO_MEM;
+
+	pte_t *ptep;
+	if ((ptep = get_pte(current->pgdir, addr, 1)) == NULL) {
+		goto failed;
+	}
+	if (!(*ptep & PTE_COW)) {
+		if (pgdir_alloc_page(current->pgdir, addr, perm) == NULL) {
+			goto failed;
+		}
+	} else {		//a present page, handle copy-on-write (cow) 
+		panic("unfinished");
+	}
+	ret = 0;
+
+failed:
+	return ret;
+}

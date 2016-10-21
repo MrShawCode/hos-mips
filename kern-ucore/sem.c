@@ -3,7 +3,6 @@
 #include <atomic.h>
 #include <pmm.h>
 #include <sem.h>
-#include <vmm.h>
 #include <ipc.h>
 #include <proc.h>
 #include <sync.h>
@@ -325,7 +324,7 @@ int ipc_sem_get_value(sem_t sem_id, int *value_store)
 		int value = semu->sem->value;
 		
 		{
-			if (copy_to_user(value_store, &value, sizeof(int))) {
+			if (memcpy(value_store, &value, sizeof(int))) {
 				ret = 0;
 			}
 		}

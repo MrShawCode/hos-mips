@@ -192,8 +192,6 @@ int try_to_wakeup(struct proc_struct *proc)
 	return ret;
 }
 
-#include <vmm.h>
-
 #define MT_SUPPORT
 
 void schedule(void)

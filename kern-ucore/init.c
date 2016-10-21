@@ -8,7 +8,6 @@
 #include <clock.h>
 #include <intr.h>
 #include <pmm.h>
-#include <vmm.h>
 #include <proc.h>
 #include <thumips_tlb.h>
 #include <sched.h>
@@ -28,16 +27,7 @@ void __noreturn kern_init(void)
 	kprintf(message);
 	print_kerninfo();
 
-#if 0
-	kprintf("EX\n");
-	__asm__ volatile ("syscall");
-	kprintf("EX RET\n");
-#endif
-
 	pmm_init();		// init physical memory management
-
-/* SZY comments: heavy commented here.*/
-	vmm_init();		// init virtual memory management
 
 	sched_init();
 	proc_init();		// init process table

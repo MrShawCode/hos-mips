@@ -1,7 +1,6 @@
 #include <types.h>
 #include <wait.h>
 #include <proc.h>
-#include <vmm.h>
 #include <ipc.h>
 #include <sync.h>
 #include <assert.h>
@@ -113,8 +112,8 @@ int ipc_event_recv(int *pid_store, int *event_store, unsigned int timeout)
 		{
 			ret = -E_INVAL;
 			if (pid_store == NULL
-			    || copy_to_user(pid_store, &pid, sizeof(int))) {
-				if (copy_to_user(event_store, &event, sizeof(int))) {
+			    || memcpy(pid_store, &pid, sizeof(int))) {
+				if (memcpy(event_store, &event, sizeof(int))) {
 					ret = 0;
 				}
 			}

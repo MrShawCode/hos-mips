@@ -81,16 +81,6 @@ int sys_getpid(void)
 	return syscall(SYS_getpid);
 }
 
-int sys_mmap(uintptr_t * addr_store, size_t len, uint32_t mmap_flags)
-{
-	return syscall(SYS_mmap, addr_store, len, mmap_flags);
-}
-
-int sys_munmap(uintptr_t addr, size_t len)
-{
-	return syscall(SYS_munmap, addr, len);
-}
-
 int sys_putc(int c)
 {
 	return syscall(SYS_putc, c);

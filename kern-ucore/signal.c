@@ -4,7 +4,6 @@
 #include <pmm.h>
 #include <signal.h>
 #include <string.h>
-#include <vmm.h>
 #include <sched.h>
 #include <mips_io.h>
 #include <mp.h>
@@ -204,13 +203,13 @@ int do_sigaction(int sign, const struct sigaction *act, struct sigaction *old)
 	}
 	int ret = 0;
 	
-	if (old != NULL && !copy_to_user(old, k, sizeof(struct sigaction))) {
+	if (old != NULL && !memcpy(old, k, sizeof(struct sigaction))) {
 		
 		ret = -E_INVAL;
 		goto out;
 	}
 	if (act == NULL
-	    || !copy_from_user(k, act, sizeof(struct sigaction), 1)) {
+	    || !memcpy(k, act, sizeof(struct sigaction))) {
 		
 		ret = -E_INVAL;
 		goto out;
@@ -246,7 +245,7 @@ int do_sigpending(sigset_t * set)
 	pending &= get_si(current)->blocked;
 	int ret = 0;
 	if (set != NULL) {
-		if (!copy_to_user(set, &pending, sizeof(sigset_t))) {
+		if (!memcpy(set, &pending, sizeof(sigset_t))) {
 			ret = -E_INVAL;
 		}
 	}
@@ -263,14 +262,10 @@ int do_sigprocmask(int how, const sigset_t * set, sigset_t * old)
 		goto out;
 	}
 	
-	if (!copy_from_user(&new, set, sizeof(sigset_t), 1)) {
-		
-		goto out;
-	}
+	memcpy(&new, set, sizeof(sigset_t));
 	if (old != NULL
-	    && !copy_to_user(old, &(get_si(current)->blocked),
+	    && !memcpy(old, &(get_si(current)->blocked),
 			     sizeof(sigset_t))) {
-		
 		goto out;
 	}
 	
@@ -299,8 +294,7 @@ out:
 int do_sigsuspend(sigset_t __user * pmask)
 {
 	sigset_t mask;
-	if (!copy_from_user(&mask, pmask, sizeof(sigset_t), 0)) {
-		
+	if (!memcpy(&mask, pmask, sizeof(sigset_t))) {
 		return -E_INVAL;
 	}
 	
@@ -652,10 +646,10 @@ int do_sigaltstack(const stack_t * ss, stack_t * old)
 	stack_t stack =
 	    { get_si(current)->sas_ss_sp, 0, get_si(current)->sas_ss_size };
 	
-	if (old != NULL && !copy_to_user(old, &stack, sizeof(stack_t))) {
+	if (old != NULL && !memcpy(old, &stack, sizeof(stack_t))) {
 		goto out;
 	}
-	if (copy_from_user(&stack, ss, sizeof(stack_t), 1)) {
+	if (memcpy(&stack, ss, sizeof(stack_t))) {
 		get_si(current)->sas_ss_sp = stack.sp;
 		get_si(current)->sas_ss_size = stack.size;
 	}
@@ -669,13 +663,12 @@ int do_sigwaitinfo(const sigset_t * setp, struct siginfo_t *info)
 	sigset_t set;
 	
 	if (setp == NULL
-	    || !copy_from_user(&set, setp, sizeof(sigset_t), 0)) {
+	    || !memcpy(&set, setp, sizeof(sigset_t))) {
 		assert(0);
 		
 		return -1;
 	}
 	
-
 	sigset_add(set, SIGKILL);
 	sigset_add(set, SIGSTOP);
 	sigset_t old_blocked = get_si(current)->blocked;
