@@ -599,7 +599,7 @@ static int __do_exit(void)
 		panic("initproc exit.\n");
 	}
 
-	struct pde_t *pgdir = current->pgdir;
+	pde_t *pgdir = current->pgdir;
 	if (pgdir != NULL) {
 		mp_set_mm_pagetable(NULL);
 		put_pgdir(pgdir);
