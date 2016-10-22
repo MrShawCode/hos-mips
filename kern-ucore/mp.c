@@ -5,7 +5,7 @@
 PLS int pls_lapic_id;
 PLS int pls_lcpu_idx;
 PLS int pls_lcpu_count;
-void mp_set_mm_pagetable(pgd_t *pgdir)
+void set_pagetable(pgd_t *pgdir)
 {
 	if (pgdir != NULL)
 		lcr3(PADDR(pgdir));

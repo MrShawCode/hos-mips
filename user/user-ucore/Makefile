@@ -6,7 +6,7 @@ TARGET_CFLAGS:= 	-I../include -I../libs -nostdinc -nostdlib -fno-builtin
 
 #TARGET_CC_SYSTEM_LIB ?=  -L/opt/FriendlyARM/toolschain/4.4.3/lib/gcc/arm-none-linux-gnueabi/4.4.3/ 
 
-USER_OBJ_ROOT := $(OBJPATH_ROOT)/user
+USER_OBJ_ROOT := $(OBJPATH_ROOT)/user-ucore
 
 USER_LIB_SRCDIR := ..
 USER_LIB_OBJDIR := $(OBJPATH_ROOT)/user
@@ -15,7 +15,7 @@ BIN := $(USER_OBJ_ROOT)/bin
 TESTBIN := $(USER_OBJ_ROOT)/testbin
 INITIAL_DIR := _initial
 
-USER_APPLIST:= pwd cat sh ls cp echo num #link mkdir rename unlink lsmod insmod rmmod mount umount
+# USER_APPLIST:= pwd cat sh ls cp echo num #link mkdir rename unlink lsmod insmod rmmod mount umount
 ifneq ($(UCORE_TEST),)
 USER_TESTLIST := $(basename $(wildcard tests/*.c))
 USER_TESTLIST += $(basename $(wildcard tests/*.c))
@@ -58,15 +58,6 @@ $(USER_OBJ_ROOT)/%.o: %.c
 $(BIN):
 	-mkdir -p $(BIN)
 
-ifeq ($(UCONFIG_SFS_MINIMAL_CONTENT),y)
-initial_dir:
-	ln -snf _initial.small $(INITIAL_DIR)
-else
-initial_dir:
-	ln -snf _initial.big $(INITIAL_DIR)
-endif
-
 clean:
 	find . -name \*.o -exec rm -f {} \;
 	rm -rf $(BIN) $(TESTBIN)
-	rm -f $(INITIAL_DIR)

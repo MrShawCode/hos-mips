@@ -21,8 +21,10 @@ KCONFIG_AUTOCONFIG=$(TOPDIR)/Makefile.config
 #User Path
 USER_OBJ_ROOT := $(OBJPATH_ROOT)/user-ucore
 BIN := $(USER_OBJ_ROOT)/bin
-USER_APPLIST:= pwd cat sh ls cp echo guessnum #link mkdir rename unlink lsmod insmod rmmod mount umount
+USER_APPLIST:= pwd cat sh ls cp echo mount umount # link mkdir rename unlink lsmod insmod rmmod 
 USER_APP_BINS:= $(addprefix $(BIN)/, $(USER_APPLIST))
+
+export USER_APPLIST
 
 MAKEFLAGS += -rR --no-print-directory
 
@@ -123,11 +125,11 @@ else
 #do nothing
 endif
 
-	@cp -r $(OBJPATH_ROOT)/user/bin $(TMPSFS)
+	@cp -r $(OBJPATH_ROOT)/user-ucore/bin $(TMPSFS)
 ifneq ($(UCORE_TEST),)
 	@cp -r $(OBJPATH_ROOT)/user/testbin $(TMPSFS)
 endif
-	@$(Q)$(MAKE) -f $(TOPDIR)/user/user-ucore/Makefile -C $(TOPDIR)/user/user-ucore initial_dir
+	@$(Q)$(MAKE) -f $(TOPDIR)/user/user-ucore/Makefile -C $(TOPDIR)/user/user-ucore
 	@if [ $(ARCH) = "mips" ]; \
 	then \
 		echo " mips"; \

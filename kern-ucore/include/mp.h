@@ -32,7 +32,7 @@ int mp_init(void);
 
 void kern_enter(int source);
 void kern_leave(void);
-void mp_set_mm_pagetable(pgd_t * pgdir);
+void set_pagetable(pgd_t * pgdir);
 void __mp_tlb_invalidate(pgd_t * pgdir, uintptr_t la);
 void mp_tlb_invalidate(pgd_t * pgdir, uintptr_t la);
 void mp_tlb_update(pgd_t * pgdir, uintptr_t la);

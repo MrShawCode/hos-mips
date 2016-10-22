@@ -212,7 +212,7 @@ void proc_run(struct proc_struct *proc)
 		{
 			pls_write(current, proc);
 			load_rsp0(next->kstack + KSTACKSIZE);
-			mp_set_mm_pagetable(next->pgdir);
+			set_pagetable(next->pgdir);
 			switch_to(&(prev->context), &(next->context));
 		}
 		local_intr_restore(intr_flag);
@@ -601,7 +601,7 @@ static int __do_exit(void)
 
 	pde_t *pgdir = current->pgdir;
 	if (pgdir != NULL) {
-		mp_set_mm_pagetable(NULL);
+		set_pagetable(NULL);
 		put_pgdir(pgdir);
 		current->pgdir = NULL;
 	}
