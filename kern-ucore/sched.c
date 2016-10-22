@@ -25,7 +25,7 @@ int sched_collect_info = 1;
 
 void db_sched(int lines)
 {
-	kprintf("\n");
+	kprintf("\n\r");
 
 	int lcpu_count = pls_read(lcpu_count);
 	int i, j, k;
@@ -33,7 +33,7 @@ void db_sched(int lines)
 	kprintf("        ");
 	for (i = 0; i < lcpu_count; i++)
 		kprintf("|    CPU%d    ", i);
-	kprintf("\n");
+	kprintf("\n\r");
 	/* Print the table */
 	for (i = 0; i < lines; i++) {
 		kprintf(" %4d ", i);
@@ -45,13 +45,13 @@ void db_sched(int lines)
 				sched_info_pid[j * lcpu_count + k],
 				sched_info_times[j * lcpu_count + k]);
 		}
-		kprintf("\n");
+		kprintf("\n\r");
 	}
 }
 
 void db_time(uint16_t left, uint16_t right)
 {
-	kprintf("\n");
+	kprintf("\n\r");
 
 	int lcpu_count = pls_read(lcpu_count);
 	int i, j;
@@ -67,7 +67,7 @@ void db_time(uint16_t left, uint16_t right)
 		sum = 0;
 		for (j = left; j <= right; j++)
 			sum += sched_slices[i][j % SLICEPOOL_SIZE];
-		kprintf("(%4d)\n", sum);
+		kprintf("(%4d)\n\r", sum);
 	}
 }
 
@@ -128,7 +128,7 @@ void sched_init(void)
 #endif
 	sched_class->init(rq);
 
-	kprintf("sched class: %s\n", sched_class->name);
+	kprintf("sched class: %s\n\r", sched_class->name);
 }
 
 void stop_proc(struct proc_struct *proc, uint32_t wait)
@@ -157,7 +157,7 @@ void wakeup_proc(struct proc_struct *proc)
 				sched_class_enqueue(proc);
 			}
 		} else {
-			warn("wakeup runnable process.\n");
+			warn("wakeup runnable process.\n\r");
 		}
 	}
 	local_intr_restore(intr_flag);
@@ -293,7 +293,7 @@ void run_timer_list(void)
 					assert(proc->wait_state &
 					       WT_INTERRUPTED);
 				} else {
-					warn("process %d's wait_state == 0.\n",
+					warn("process %d's wait_state == 0.\n\r",
 					     proc->pid);
 				}
 

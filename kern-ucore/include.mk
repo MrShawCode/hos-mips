@@ -4,6 +4,6 @@ else
 MACH_DEF := -DMACH_QEMU
 endif
 
-ARCH_CFLAGS := -mips1 $(MACH_DEF) -fno-builtin -nostdlib  -nostdinc -g  -EL -G0 -Wformat -O2 -mno-float
+ARCH_CFLAGS := -g $(MACH_DEF) -fno-builtin -nostdlib  -nostdinc -EL -mno-mips16  -msoft-float -march=m14k -G0 -Wformat -O2 -msoft-float
 ARCH_LDFLAGS := -n -G 0 -static -EL -nostdlib
 

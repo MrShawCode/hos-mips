@@ -154,7 +154,7 @@ static inline pgd_t *init_pgdir_get(void)
 	return boot_pgdir;
 }
 
-#define TEST_PAGE 0x80000000
+#define TEST_PAGE 0x80001000
 #define NEXT_PAGE(pg) (pg + 1)
 static inline struct Page *pgd2page(pgd_t pgd)
 {

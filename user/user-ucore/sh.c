@@ -71,13 +71,13 @@ char *readline(const char *prompt)
 		if (c == 3) {
 			return NULL;
 		} else if (c >= ' ' && i < BUFSIZE - 1) {
-			//putc(c);
+			putc(c);
 			buffer[i++] = c;
 		} else if (c == '\b' && i > 0) {
-			//putc(c);
+			putc(c);
 			i--;
 		} else if (c == '\n' || c == '\r') {
-			//putc(c);
+			putc(c);
 			buffer[i] = '\0';
 			break;
 		}
@@ -217,7 +217,7 @@ runit:
 int main(int argc, char **argv)
 {
 	int ret, interactive = 1;
-	printf("Welcome to sh!\n");
+	printf("Welcome to sh!\n\r");
 	if (argc == 2) {
 		if ((ret = reopen(0, argv[1], O_RDONLY)) != 0) {
 			return ret;
@@ -232,7 +232,7 @@ int main(int argc, char **argv)
 
 	char *buffer;
 	while ((buffer = readline((interactive) ? "$ " : NULL)) != NULL) {
-		printf("\n");
+		printf("\n\r");
 		shcwd[0] = '\0';
 		int pid;
 		if ((pid = fork()) == 0) {

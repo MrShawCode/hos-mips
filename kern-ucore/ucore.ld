@@ -4,7 +4,7 @@ ENTRY(kernel_entry)
 
 SECTIONS
 {
-  . = 0x80000000;
+  . = 0x80001000;
   .text      :
   {
     . = ALIGN(4);

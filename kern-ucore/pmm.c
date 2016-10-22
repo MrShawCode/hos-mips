@@ -12,6 +12,8 @@
 #include <proc.h>
 #include <list.h>
 #include <mp.h>
+#include <thumips_tlb.h>
+#include <mips_io.h>
 
 // virtual address of physicall page array
 struct Page *pages;
@@ -45,7 +47,7 @@ static void init_pmm_manager(void)
 	pmm_manager = &default_pmm_manager;
 	kprintf("memory management: ");
 	kprintf(pmm_manager->name);
-	kprintf("\n");
+	kprintf("\n\r");
 	pmm_manager->init();
 }
 
@@ -100,12 +102,12 @@ static void page_init(void)
 	int i;
 
 	//panic("unimpl");
-	kprintf("memory map:\n");
+	kprintf("memory map:\n\r");
 	kprintf("    [0x");
 	printhex(KERNBASE);
 	kprintf(", 0x");
 	printhex(KERNTOP);
-	kprintf("]\n\n");
+	kprintf("]\n\r\n\r");
 
 	maxpa = KERNTOP;
 	npage = KMEMSIZE >> PGSHIFT;
@@ -122,7 +124,7 @@ static void page_init(void)
 
 	uintptr_t freemem =
 	    PADDR((uintptr_t) pages + sizeof(struct Page) * npage);
-	kprintf( "freemem start at:%x\n", freemem );
+	kprintf( "freemem start at:%x\n\r", freemem );
 
 	uint32_t mbegin = ROUNDUP_2N(freemem, PGSHIFT);
 	uint32_t mend = ROUNDDOWN_2N(KERNTOP, PGSHIFT);
@@ -166,7 +168,7 @@ static void *boot_alloc_page(void)
 {
 	struct Page *p = alloc_page();
 	if (p == NULL) {
-		panic("boot_alloc_page failed.\n");
+		panic("boot_alloc_page failed.\n\r");
 	}
 	return page2kva(p);
 }
@@ -243,7 +245,7 @@ static inline void page_remove_pte(pde_t * pgdir, uintptr_t la, pte_t * ptep)
 static void check_alloc_page(void)
 {
 	pmm_manager->check();
-	kprintf("check_alloc_page() succeeded!\n");
+	kprintf("check_alloc_page() succeeded!\n\r");
 }
 
 static void check_pgdir(void)
@@ -291,7 +293,7 @@ static void check_pgdir(void)
 	free_page(pa2page(boot_pgdir[0]));
 	boot_pgdir[0] = 0;
 
-	kprintf("check_pgdir() succeeded!\n");
+	kprintf("check_pgdir() succeeded!\n\r");
 }
 
 static void check_boot_pgdir(void)
@@ -328,7 +330,7 @@ static void check_boot_pgdir(void)
 	boot_pgdir[0] = 0;
 	tlb_invalidate_all();
 
-	kprintf("check_boot_pgdir() succeeded!\n");
+	kprintf("check_boot_pgdir() succeeded!\n\r");
 }
 
 //perm2str - use string 'u,r,w,-' to present the permission
@@ -381,12 +383,12 @@ get_pgtable_items(size_t left, size_t right, size_t start, uintptr_t * table,
 
 #define PRINT_PTE(s0, a0,a1,a2,a3,s1) kprintf(s0);printhex(a0);\
   kprintf(") ");printhex(a1);kprintf("-");printhex(a2);kprintf(" ");\
-  printhex(a3);kprintf(" ");kprintf(s1);kprintf("\n");
+  printhex(a3);kprintf(" ");kprintf(s1);kprintf("\n\r");
 //print_pgdir - print the PDT&PT
 void print_pgdir(void)
 {
 	size_t left, right = 0, perm;
-	kprintf("---------------- PAGE Directory BEGIN ----------------\n");
+	kprintf("---------------- PAGE Directory BEGIN ----------------\n\r");
 /* SZY comments: why this shows empty in QEMU emulator? */
 	while ((perm =
 		get_pgtable_items(0, NPDEENTRY, right, current_pgdir, &left,
@@ -429,7 +431,7 @@ void print_pgdir(void)
 			}
 		}
 	}
-	kprintf("---------------- PAGE Directory END ------------------\n");
+	kprintf("---------------- PAGE Directory END ------------------\n\r");
 }
 
 //added by HHL
@@ -530,7 +532,7 @@ pte_t *get_pte(pgd_t * pgdir, uintptr_t la, bool create)
 {
 /* SZY comments: PMXSHIFT seems undefined here! Possibly, the compare of PTXSHIFT and PMXSHIFT directly produce false */
 #if PTXSHIFT == PMXSHIFT
-	printk( "PMXSHIFT is defined as:0x%x\n", PMXSHIFT );
+	printk( "PMXSHIFT is defined as:0x%x\n\r", PMXSHIFT );
 	return get_pmd(pgdir, la, create);
 #else /* PTXSHIFT == PMXSHIFT */
 	pmd_t *pmdp;
@@ -813,7 +815,7 @@ copy_range(pgd_t * to, pgd_t * from, uintptr_t start, uintptr_t end, bool share)
 				return -E_NO_MEM;
 			}
 			int ret;
-			//kprintf("%08x %08x %08x\n", nptep, *nptep, start);
+			//kprintf("%08x %08x %08x\n\r", nptep, *nptep, start);
 			assert(*ptep != 0 && *nptep == 0);
 			if (ptep_present(ptep)) {
 				pte_perm_t perm = ptep_get_perm(ptep, PTE_USER);
@@ -870,7 +872,7 @@ kfree(void *ptr) {
 		}
 	}
 	if(n > 1024 * 1024 || n <= 0)
-		kprintf("%d %d %d\n",i, index, n);
+		kprintf("%d %d %d\n\r",i, index, n);
     assert(n > 0 && n < 1024*1024);
     assert(ptr != NULL);
     struct Page *base=NULL;

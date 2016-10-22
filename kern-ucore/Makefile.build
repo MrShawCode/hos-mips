@@ -4,8 +4,8 @@ endif
 
 PHONY+=all subdir clean
 
-#TARGET_CFLAGS := -g -ggdb
-TARGET_CFLAGS += -fno-builtin -nostdlib  -nostdinc -Wformat
+TARGET_CFLAGS := -g -ggdb
+TARGET_CFLAGS += -fno-builtin -nostdlib  -nostdinc -Wformat -mno-mips16 -mno-micromips -msoft-float -march=m14k
 TARGET_CFLAGS += -D__KERNEL__ -D__KERN__ 
 TARGET_CFLAGS += $(shell echo $(UCONFIG_ADDITIONAL_CFLAGS))
 

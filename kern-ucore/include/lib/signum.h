@@ -131,7 +131,7 @@ typedef struct {
 #define SA_RESTART   0x10000000	/* Restart syscall on signal return.  */
 #define SA_NODEFER   0x40000000	/* Don't automatically block the signal when
 				   its handler is being executed.  */
-#define SA_RESETHAND 0x80000000	/* Reset to SIG_DFL on entry to handler.  */
+#define SA_RESETHAND 0x80001000	/* Reset to SIG_DFL on entry to handler.  */
 #define SA_INTERRUPT 0x20000000	/* Historical no-op.  */
 
 /* Some aliases for the SA_ constants.  */

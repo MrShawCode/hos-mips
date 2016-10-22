@@ -47,7 +47,7 @@ static int dev_stdin_read(char *buf, size_t len)
 			if (ret >= len)
 				break;
 try_again:
-			if (p_rpos < p_wpos) {
+/*			if (p_rpos < p_wpos) {
 				char c = stdin_buffer[p_rpos % STDIN_BUFSIZE];
 				//FIXME
 				kcons_putc(c);
@@ -55,6 +55,18 @@ try_again:
 				p_rpos++;
 				ret++;
 				if (p_rpos >= p_wpos)
+					break;
+*/
+			//kprintf("p_rpos:%d,p_wpos:%d",p_rpos,p_wpos);
+			if (p_rpos >= p_wpos) {
+				//kprintf("asd1234\n\r");
+				char c = stdin_buffer[p_rpos % STDIN_BUFSIZE];
+				//FIXME
+				c=getchar();
+				*buf++ = c;
+				p_rpos++;
+				ret++;
+				if (p_rpos <= p_wpos)
 					break;
 			} else {
 				wait_t __wait, *wait = &__wait;
@@ -124,12 +136,12 @@ void dev_init_stdin(void)
 {
 	struct inode *node;
 	if ((node = dev_create_inode()) == NULL) {
-		panic("stdin: dev_create_node.\n");
+		panic("stdin: dev_create_node.\n\r");
 	}
 	stdin_device_init(vop_info(node, device));
 
 	int ret;
 	if ((ret = vfs_add_dev("stdin", node, 0)) != 0) {
-		panic("stdin: vfs_add_dev: %e.\n", ret);
+		panic("stdin: vfs_add_dev: %e.\n\r", ret);
 	}
 }

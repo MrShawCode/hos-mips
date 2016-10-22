@@ -61,7 +61,7 @@ void fs_destroy(struct fs_struct *fs_struct)
 			filemap_close(file);
 		}
 		if (file->status != FD_NONE)
-			kprintf("file->fd:%d\n", file->fd);
+			kprintf("file->fd:%d\n\r", file->fd);
 		assert(file->status == FD_NONE);
 	}
 	kfree(fs_struct);

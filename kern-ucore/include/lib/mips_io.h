@@ -17,6 +17,8 @@ void printbase10(int x);
 /* kern/libs/readline.c */
 char *readline(const char *prompt);
 
-#define PRINT_HEX(str,x) {kprintf(str);printhex((unsigned int)x);kprintf("\n");}
+//#define PRINT_HEX(str,x) {kprintf(str);printhex((unsigned int)x);kprintf("\n");}
+
+void PRINT_HEX(const char *str,int x);
 
 #endif /* !__LIBS_STDIO_H__ */

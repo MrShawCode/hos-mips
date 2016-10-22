@@ -4,7 +4,7 @@
   2012/07/16
  */
 
-#define FLASH_START 0xBE000000
+#define FLASH_START 0xbfc00000
 #define FLASH_SIZE  0x01000000
 #define ELF_MAGIC 0x464C457F
 

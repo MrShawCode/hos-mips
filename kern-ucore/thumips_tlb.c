@@ -29,11 +29,24 @@
 void tlb_invalidate(pde_t * pgdir, uintptr_t la)
 {
 	tlb_invalidate_all();
+	return;
 }
 
 void tlb_invalidate_all()
-{				//kprintf("\n\n\n\ntlb_invalidate_all()\n\n\n\n");
-	int i;
-	for (i = 0; i < 128 * 128; i++)// 
-		write_one_tlb(i, 0, 0x80000000 + (i << 20), 0, 0);//13
+{
+    unsigned int i;
+    unsigned int te;
+
+    //kprintf("\n\rbegin tlb_invalidate_all()\n\r");
+    //dump_tlb_all();
+    for (i = 0; i < 16; i++)//
+    {
+        te=0x80000000 + (i << 20);
+        //kprintf("te=0x%08x \n\r",te);
+        write_one_tlb(i, 0, te, 0, 0);//13
+    }
+    //dump_tlb_all();
+    //kprintf("\n\rend");
+
+    return ;
 }

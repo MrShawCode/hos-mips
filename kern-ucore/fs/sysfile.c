@@ -168,7 +168,7 @@ out:
 int sysfile_writev(int fd, struct iovec __user * iov, int iovcnt)
 {
 	/* do nothing but return 0 */
-	kprintf("writev: fd=%08x iov=%08x iovcnt=%d\n", fd, iov, iovcnt);
+	kprintf("writev: fd=%08x iov=%08x iovcnt=%d\n\r", fd, iov, iovcnt);
 	struct iovec *tv;
 	int rcode = 0, count = 0, i;
 	struct mm_struct *mm = pls_read(current)->mm;
@@ -283,7 +283,7 @@ int sysfile_linux_fstat64(int fd, struct linux_stat64 __user * buf)
 
 int sysfile_linux_fcntl64(int fd, int cmd, int arg)
 {
-	kprintf("sysfile_linux_fcntl64:fd=%08x cmd=%08x arg=%08x\n", fd, cmd,
+	kprintf("sysfile_linux_fcntl64:fd=%08x cmd=%08x arg=%08x\n\r", fd, cmd,
 		arg);
 	return 0;
 }

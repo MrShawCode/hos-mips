@@ -132,3 +132,10 @@ int getchar(void)
 		/* do nothing */ ;
 	return c;
 }
+
+void PRINT_HEX(const char *str,int x)
+{
+    kprintf(str);
+    printhex((unsigned int)x);
+    kprintf("\n\r");
+}

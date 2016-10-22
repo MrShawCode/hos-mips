@@ -309,7 +309,7 @@ vfs_mount(const char *devname,
 	struct device *dev = vop_info(vdev->devnode, device);
 	if ((ret = mountfunc(dev, &(vdev->fs))) == 0) {
 		assert(vdev->fs != NULL);
-		kprintf("vfs: mount %s.\n", vdev->devname);
+		kprintf("\n\rvfs: mount %s.\n\r", vdev->devname);
 	}
 
 out:
@@ -341,7 +341,7 @@ int vfs_unmount(const char *devname)
 	if ((ret = fsop_unmount(vdev->fs)) == 0) {
 		/* now drop the filesystem */
 		vdev->fs = NULL;
-		kprintf("vfs: unmount %s.\n", vdev->devname);
+		kprintf("vfs: unmount %s.\n\r", vdev->devname);
 	}
 
 out:
@@ -364,19 +364,19 @@ int vfs_unmount_all(void)
 					int ret;
 					if ((ret = fsop_sync(vdev->fs)) != 0) {
 						kprintf
-						    ("vfs: warning: sync failed for %s: %e.\n",
+						    ("vfs: warning: sync failed for %s: %e.\n\r",
 						     vdev->devname, ret);
 						continue;
 					}
 					if ((ret = fsop_unmount(vdev->fs)) != 0) {
 						kprintf
-						    ("vfs: warning: unmount failed for %s: %e.\n",
+						    ("vfs: warning: unmount failed for %s: %e.\n\r",
 						     vdev->devname, ret);
 						continue;
 					}
 					/* now drop the filesystem */
 					vdev->fs = NULL;
-					kprintf("vfs: unmount %s.\n",
+					kprintf("vfs: unmount %s.\n\r",
 						vdev->devname);
 				}
 			}

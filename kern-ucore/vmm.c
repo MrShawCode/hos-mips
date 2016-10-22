@@ -624,7 +624,7 @@ static void check_vmm(void)
 
 	__CHECK_MEMORY_LEAK();
 
-	kprintf("check_vmm() succeeded.\n");
+	kprintf("check_vmm() succeeded.\n\r");
 }
 
 static void check_vma_struct(void)
@@ -672,7 +672,7 @@ static void check_vma_struct(void)
 
 	__CHECK_MEMORY_LEAK();
 
-	kprintf("check_vma_struct() succeeded!\n");
+	kprintf("check_vma_struct() succeeded!\n\r");
 }
 
 struct mm_struct *check_mm_struct;
@@ -681,7 +681,7 @@ struct mm_struct *check_mm_struct;
 static void check_pgfault(void)
 {
 #ifdef UCONFIG_CHECK_PGFAULT
-	kprintf("starting check_pgfault()\n");
+	kprintf("starting check_pgfault()\n\r");
 	size_t nr_used_pages_store = nr_used_pages();
 
 	check_mm_struct = mm_create();
@@ -725,7 +725,7 @@ static void check_pgfault(void)
 
 	assert(nr_used_pages_store == nr_used_pages());
 
-	kprintf("check_pgfault() succeeded!\n");
+	kprintf("check_pgfault() succeeded!\n\r");
 #endif
 }
 
@@ -743,7 +743,7 @@ int do_pgfault(struct mm_struct *mm, machine_word_t error_code, uintptr_t addr)
 		 * give handler a chance to deal with it 
 		 */
 		kprintf
-		    ("page fault in kernel thread: pid = %d, name = %s, %d %08x.\n",
+		    ("page fault in kernel thread: pid = %d, name = %s, %d %08x.\n\r",
 		     current->pid, current->name, error_code, addr);
 		return -E_KILLED;
 	}
@@ -767,7 +767,7 @@ int do_pgfault(struct mm_struct *mm, machine_word_t error_code, uintptr_t addr)
 			goto failed;
 		}
 	}
-	//kprintf("@ %x %08x\n", vma->vm_flags, vma->vm_start);
+	//kprintf("@ %x %08x\n\r", vma->vm_flags, vma->vm_start);
 	//assert((vma->vm_flags & VM_IO)==0);
 	if (vma->vm_flags & VM_IO) {
 		ret = -E_INVAL;
@@ -823,7 +823,7 @@ int do_pgfault(struct mm_struct *mm, machine_word_t error_code, uintptr_t addr)
 				page_insert(mm->pgdir, pa2page(*sh_ptep), addr,
 					    perm);
 			} else {
-				panic("NO SWAP\n");
+				panic("NO SWAP\n\r");
 			}
 		}
 	} else {		//a present page, handle copy-on-write (cow) 
@@ -836,7 +836,7 @@ int do_pgfault(struct mm_struct *mm, machine_word_t error_code, uintptr_t addr)
 		if (!(!ptep_present(ptep)
 		      || ((error_code & 2) && !ptep_u_write(ptep) && cow))) {
 			//assert(PADDR(mm->pgdir) == rcr3());
-			kprintf("%p %p %d %d %x\n", *ptep, addr, error_code,
+			kprintf("%p %p %d %d %x\n\r", *ptep, addr, error_code,
 				cow, vma->vm_flags);
 			assert(0);
 		}
@@ -862,7 +862,7 @@ int do_pgfault(struct mm_struct *mm, machine_word_t error_code, uintptr_t addr)
 				}
 				memcpy(page2kva(newpage), page2kva(page),
 				       PGSIZE);
-				//kprintf("COW!\n");
+				//kprintf("COW!\n\r");
 				page = newpage, newpage = NULL;
 			}
 		}

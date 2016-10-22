@@ -41,7 +41,7 @@ static const struct inode_ops *sfs_get_ops(uint16_t type)
 	case SFS_TYPE_FILE:
 		return &sfs_node_fileops;
 	}
-	panic("invalid file type %d.\n", type);
+	panic("invalid file type %d.\n\r", type);
 }
 
 static list_entry_t *sfs_hash_list(struct sfs_fs *sfs, uint32_t ino)
@@ -66,7 +66,7 @@ static bool sfs_block_inuse(struct sfs_fs *sfs, uint32_t ino)
 	if (ino != 0 && ino < sfs->super.blocks) {
 		return !bitmap_test(sfs->freemap, ino);
 	}
-	panic("sfs_block_inuse: called out of range (0, %u) %u.\n",
+	panic("sfs_block_inuse: called out of range (0, %u) %u.\n\r",
 	      sfs->super.blocks, ino);
 }
 
@@ -453,7 +453,7 @@ sfs_dirent_unlink_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, int slot,
     ({                                                                              \
         int err;                                                                    \
         if ((err = sfs_dirent_link_nolock(sfs, sin, slot, lnksin, name)) != 0) {    \
-            warn("sfs_dirent_link error: %e.\n", err);                              \
+            warn("sfs_dirent_link error: %e.\n\r", err);                              \
         }                                                                           \
         err;                                                                        \
     })
@@ -462,7 +462,7 @@ sfs_dirent_unlink_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, int slot,
     ({                                                                              \
         int err;                                                                    \
         if ((err = sfs_dirent_unlink_nolock(sfs, sin, slot, lnksin)) != 0) {        \
-            warn("sfs_dirent_unlink error: %e.\n", err);                            \
+            warn("sfs_dirent_unlink error: %e.\n\r", err);                            \
         }                                                                           \
         err;                                                                        \
     })
@@ -1174,7 +1174,7 @@ static int sfs_gettype(struct inode *node, uint32_t * type_store)
 		*type_store = S_IFLNK;
 		return 0;
 	}
-	panic("invalid file type %d.\n", din->type);
+	panic("invalid file type %d.\n\r", din->type);
 }
 
 static int sfs_tryseek(struct inode *node, off_t pos)

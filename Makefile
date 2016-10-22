@@ -11,11 +11,11 @@ else	#cygwin
 TOPDIR=$(shell cygpath -w `pwd` | sed 's|\\|/|g')
 endif
 
-Q :=@
+#Q :=@
 
 KTREE = $(TOPDIR)/kern-ucore
 OBJPATH_ROOT := $(TOPDIR)/obj
-export TOPDIR KTREE OBJPATH_ROOT
+export TOPDIR KTREE OBJPATH_ROOT Q
 
 KCONFIG_AUTOCONFIG=$(TOPDIR)/Makefile.config
 #User Path
@@ -32,7 +32,6 @@ include $(KCONFIG_AUTOCONFIG)
 ARCH ?= $(patsubst "%",%,$(UCONFIG_ARCH))
 CROSS_COMPILE ?= $(UCONFIG_CROSS_COMPILE)
 
-export CONFIG_SHELL quiet Q KBUILD_VERBOSE
 export ARCH CROSS_COMPILE KCONFIG_AUTOCONFIG
 
 TARGET_CC := $(CROSS_COMPILE)gcc
@@ -56,9 +55,9 @@ HOSTCC:=gcc
 HOSTCXX:=g++
 HOSTLD:=ld
 HOSTLN:=ln
-ifndef CFLAGS_FOR_BUILD
+
 CFLAGS_FOR_BUILD:=-g -O2
-endif
+
 export HOSTAR HOSTAS HOSTCC HOSTCXX HOSTLD
 
 HOSTCFLAGS=$(CFLAGS_FOR_BUILD)

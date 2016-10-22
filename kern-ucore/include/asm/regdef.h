@@ -7,9 +7,8 @@
  * Copyright (C) 1994, 95, 99, 2003 by Ralf Baechle
  * Copyright (C) 1990 - 1992, 1999 Silicon Graphics, Inc.
  */
-#ifndef _ASM_REGDEF_H
-#define _ASM_REGDEF_H
-
+#ifndef _REGDEF_H
+#define _REGDEF_H
 /*
  * Symbolic register names for 32 bit ABI
  */

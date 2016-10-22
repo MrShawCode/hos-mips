@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <arch.h>
 #include <trap.h>
-#include <picirq.h>
+//#include <picirq.h>
+#include <intr.h>
+
 #include <fs.h>
 #include <ide.h>
 #include <assert.h>

@@ -3,13 +3,13 @@
 
 /* This file contains the definitions for memory management in our OS. */
 
-#define KERNBASE            0x80000000
+#define KERNBASE            0x80001000
 
-#ifdef MACH_FPGA
-#define KMEMSIZE            0x7FFFF0 //(1 << 20) for NEXYS4 board
-#else
-#define KMEMSIZE            (32 << 20)	// 512M the maximum amount of physical memory for qemu environment
-#endif
+//#ifdef MACH_FPGA
+//#define KMEMSIZE            0x7FFFF0 //(1 << 20) for NEXYS4 board
+//#else
+#define KMEMSIZE            (32 << 20)  // 512M the maximum amount of physical memory
+//#endif
 
 #define KERNTOP             (KERNBASE + KMEMSIZE)
 
@@ -18,7 +18,7 @@ as before! no luck */
 #define KSTACKPAGE          2	// # of pages in kernel stack
 #define KSTACKSIZE          (KSTACKPAGE * 4096)	// sizeof kernel stack
 
-#define USERBASE            0x10000000
+#define USERBASE            0x00000000
 #define USERTOP             MIPS_KSEG0
 
 #define USTACKTOP           USERTOP

@@ -64,7 +64,7 @@ int inode_ref_dec(struct inode *node)
 	int ref_count, ret;
 	if ((ref_count = atomic_sub_return(&(node->ref_count), 1)) == 0) {
 		if ((ret = vop_reclaim(node)) != 0 && ret != -E_BUSY) {
-			kprintf("vfs: warning: vop_reclaim: %e.\n", ret);
+			kprintf("vfs: warning: vop_reclaim: %e.\n\r", ret);
 		}
 	}
 	return ref_count;
@@ -90,7 +90,7 @@ int inode_open_dec(struct inode *node)
 	int open_count, ret;
 	if ((open_count = atomic_sub_return(&(node->open_count), 1)) == 0) {
 		if ((ret = vop_close(node)) != 0) {
-			kprintf("vfs: warning: vop_close: %e.\n", ret);
+			kprintf("vfs: warning: vop_close: %e.\n\r", ret);
 		}
 	}
 	return open_count;

@@ -12,6 +12,6 @@ int main(int argc, char **argv)
 	if ((ret = getcwd(cwdbuf, sizeof(cwdbuf))) != 0) {
 		return ret;
 	}
-	printf("%s\n", cwdbuf);
+	printf("%s\n\r", cwdbuf);
 	return 0;
 }
