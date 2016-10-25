@@ -1,5 +1,4 @@
 #include <types.h>
-#include <string.h>
 #include <syscall.h>
 #include <stdio.h>
 #include <ulib.h>
@@ -73,21 +72,6 @@ int getpid(void)
 void print_pgdir(void)
 {
 	sys_pgdir();
-}
-
-int mmap(uintptr_t * addr_store, size_t len, uint32_t mmap_flags)
-{
-	return sys_mmap(addr_store, len, mmap_flags);
-}
-
-int munmap(uintptr_t addr, size_t len)
-{
-	return sys_munmap(addr, len);
-}
-
-int shmem(uintptr_t * addr_store, size_t len, uint32_t mmap_flags)
-{
-	return sys_shmem(addr_store, len, mmap_flags);
 }
 
 sem_t sem_init(int value)

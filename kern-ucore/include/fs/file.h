@@ -52,8 +52,6 @@ int file_mkfifo(const char *name, uint32_t open_flags);
 int linux_devfile_read(int fd, void *base, size_t len, size_t * copied_store);
 int linux_devfile_write(int fd, void *base, size_t len, size_t * copied_store);
 int linux_devfile_ioctl(int fd, unsigned int cmd, unsigned long arg);
-void *linux_devfile_mmap2(void *addr, size_t len, int prot, int flags, int fd,
-			  size_t pgoff);
 
 static inline int fopen_count(struct file *file)
 {

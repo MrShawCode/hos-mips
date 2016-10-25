@@ -4,9 +4,9 @@ ULIB_OBJ_ROOT := $(OBJPATH_ROOT)/user
 ULIB_A := $(ULIB_OBJ_ROOT)/ulib.a
 
 TARGET_CFLAGS := -I. -Iinclude -Ilib -nostdinc -nostdlib -fno-builtin
-obj-y := dir.o file.o malloc.o panic.o signal.o spipe.o \
-				stdio.o string.o syscall.o thread.o ulib.o umain.o mod.o mount.o
-obj-y += lib/hash.o lib/rand.o lib/printfmt.o lib/string.o
+obj-y := dir.o file.o panic.o signal.o \
+				stdio.o syscall.o ulib.o umain.o mod.o mount.o
+obj-y += lib/hash.o lib/rand.o lib/printfmt.o lib/string.o 
 
 ifeq  ($(ON_FPGA), y)
 MACH_DEF := -DMACH_FPGA

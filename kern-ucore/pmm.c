@@ -537,8 +537,12 @@ pte_t *get_pte(pgd_t * pgdir, uintptr_t la, bool create)
 #else /* PTXSHIFT == PMXSHIFT */
 	pmd_t *pmdp;
 	if ((pmdp = get_pmd(pgdir, la, create)) == NULL) {
+		if(pmdp == NULL)
+		 kprintf("pmdp == NULL\n");
+	
 		return NULL;
 	}
+	
 	if (!ptep_present(pmdp)) {
 		struct Page *page;
 		if (!create || (page = alloc_page()) == NULL) {
@@ -788,53 +792,54 @@ void exit_range(pgd_t * pgdir, uintptr_t start, uintptr_t end)
 	exit_range_pgd(pgdir, start, end);
 }
 
-/* ucore use copy-on-write when forking a new process,
- * thus copy_range only copy pdt/pte and set their permission to 
- * READONLY, a write will be handled in pgfault
+/* copy_range - copy content of memory (start, end) of one process A to another process B
+ * @to:    the addr of process B's Page Directory
+ * @from:  the addr of process A's Page Directory
+ * @share: flags to indicate to dup OR share. We just use dup method, so it didn't be used.
+ *
+ * CALL GRAPH: copy_mm-->dup_mmap-->copy_range
  */
-int
-copy_range(pgd_t * to, pgd_t * from, uintptr_t start, uintptr_t end, bool share)
-{
-	assert(start % PGSIZE == 0 && end % PGSIZE == 0);
-	assert(USER_ACCESS(start, end));
+int copy_range(pde_t *to, pde_t *from, uintptr_t start, uintptr_t end, bool share) {
+    assert(start % PGSIZE == 0 && end % PGSIZE == 0);
+    assert(USER_ACCESS(start, end));
+    // copy content by page unit.
+    do {
+        //call get_pte to find process A's pte according to the addr start
+        pte_t *ptep = get_pte(from, start, 0), *nptep;
+        if (ptep == NULL) {
+            start = ROUNDDOWN(start + PTSIZE, PTSIZE);
+            continue ;
+        }
+        //call get_pte to find process B's pte according to the addr start. If pte is NULL, just alloc a PT
+        if (*ptep & PTE_P) {
+            if ((nptep = get_pte(to, start, 1)) == NULL) {
+                return -E_NO_MEM;
+            }
+        uint32_t perm = (*ptep & PTE_USER);
+        //get page from ptep
+        struct Page *page = pte2page(*ptep);
+        // alloc a page for process B
+        struct Page *npage=alloc_page();
+        assert(page!=NULL);
+        assert(npage!=NULL);
+        int ret=0;
+        /*   
+         * (1) find src_kvaddr: the kernel virtual address of page
+         * (2) find dst_kvaddr: the kernel virtual address of npage
+         * (3) memory copy from src_kvaddr to dst_kvaddr, size is PGSIZE
+         * (4) build the map of phy addr of  nage with the linear addr start
+         */
+        void * kva_src = page2kva(page);
+        void * kva_dst = page2kva(npage);
+    
+        memcpy(kva_dst, kva_src, PGSIZE);
 
-	do {
-		pte_t *ptep = get_pte(from, start, 0), *nptep;
-		if (ptep == NULL) {
-			if (get_pud(from, start, 0) == NULL) {
-				start = ROUNDDOWN(start + PUSIZE, PUSIZE);
-			} else if (get_pmd(from, start, 0) == NULL) {
-				start = ROUNDDOWN(start + PMSIZE, PMSIZE);
-			} else {
-				start = ROUNDDOWN(start + PTSIZE, PTSIZE);
-			}
-			continue;
-		}
-		if (*ptep != 0) {
-			if ((nptep = get_pte(to, start, 1)) == NULL) {
-				return -E_NO_MEM;
-			}
-			int ret;
-			//kprintf("%08x %08x %08x\n\r", nptep, *nptep, start);
-			assert(*ptep != 0 && *nptep == 0);
-			if (ptep_present(ptep)) {
-				pte_perm_t perm = ptep_get_perm(ptep, PTE_USER);
-				struct Page *page = pte2page(*ptep);
-				if (!share && ptep_s_write(ptep)) {
-					ptep_unset_s_write(&perm);
-					page_insert(from, page, start,
-						    perm);
-				}
-				ret = page_insert(to, page, start, perm);
-				assert(ret == 0);
-			}
-			else {
-				assert(0);
-			}
-		}
-		start += PGSIZE;
-	} while (start != 0 && start < end);
-	return 0;
+        ret = page_insert(to, npage, start, perm);
+        assert(ret == 0);
+        }
+        start += PGSIZE;
+    } while (start != 0 && start < end);
+    return 0;
 }
 
 

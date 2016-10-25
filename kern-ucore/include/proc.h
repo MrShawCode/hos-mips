@@ -28,7 +28,6 @@ enum proc_state {
 #define MAX_PID                     (MAX_PROCESS * 2)
 
 extern list_entry_t proc_list;
-extern list_entry_t proc_mm_list;
 
 struct inode;
 struct fs_struct;
@@ -42,7 +41,6 @@ struct proc_struct {
 	uintptr_t kstack;	// Process kernel stack
 	volatile bool need_resched;	// bool value: need to be rescheduled to release CPU?
 	struct proc_struct *parent;	// the parent process
-	struct mm_struct *mm;	// Process's memory management field
 	struct context context;	// Switch here to run process
 	struct trapframe *tf;	// Trap frame for current interrupt
 	uintptr_t cr3;		// CR3 register: the base addr of Page Directroy Table(PDT)
@@ -67,6 +65,7 @@ struct proc_struct {
 	struct proc_signal signal_info;
 
 	void *tls_pointer;
+	pgd_t *pgdir;
 };
 
 struct linux_timespec {
@@ -122,28 +121,18 @@ int do_execve(const char *name, const char **argv, const char **envp);
 int do_yield(void);
 int do_wait(int pid, int *code_store);
 int do_kill(int pid, int error_code);
-int do_brk(uintptr_t * brk_store);
-int do_linux_brk(uintptr_t brk);
 int do_sleep(unsigned int time);
-int do_mmap(uintptr_t * addr_store, size_t len, uint32_t mmap_flags);
-int do_munmap(uintptr_t addr, size_t len);
-int do_shmem(uintptr_t * addr_store, size_t len, uint32_t mmap_flags);
 int do_linux_waitpid(int pid, int *code_store);
 
 /* Implemented by archs */
 struct proc_struct *alloc_proc(void);
 void switch_to(struct context *from, struct context *to);
 
-/* For TLS(Thread Local Storage */
-void tls_switch(struct proc_struct *proc);
-
-void de_thread_arch_hook(struct proc_struct *proc);
 int copy_thread(uint32_t clone_flags, struct proc_struct *proc,
 		uintptr_t user_stack, struct trapframe *tf);
 int init_new_context(struct proc_struct *proc, struct elfhdr *elf,
 		     int argc, char **kargv, int envc, char **kenvp);
 int kernel_thread(int (*fn) (void *), void *arg, uint32_t clone_flags);
 int kernel_execve(const char *name, const char **argv, const char **kenvp);
-int do_execve_arch_hook(int argc, char **kargv);
 
 #endif /* !__KERN_PROCESS_PROC_H__ */

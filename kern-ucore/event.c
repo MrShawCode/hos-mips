@@ -1,7 +1,6 @@
 #include <types.h>
 #include <wait.h>
 #include <proc.h>
-#include <vmm.h>
 #include <ipc.h>
 #include <sync.h>
 #include <assert.h>
@@ -103,34 +102,23 @@ int ipc_event_recv(int *pid_store, int *event_store, unsigned int timeout)
 		return -E_INVAL;
 	}
 
-	struct mm_struct *mm = current->mm;
-	if (pid_store != NULL) {
-		if (!user_mem_check(mm, (uintptr_t) pid_store, sizeof(int), 1)) {
-			return -E_INVAL;
-		}
-	}
-	if (!user_mem_check(mm, (uintptr_t) event_store, sizeof(int), 1)) {
-		return -E_INVAL;
-	}
-
 	unsigned long saved_ticks;
 	timer_t __timer, *timer =
 	    ipc_timer_init(timeout, &saved_ticks, &__timer);
 
 	int pid, event, ret;
 	if ((ret = recv_event(&pid, &event, timer)) == 0) {
-		lock_mm(mm);
+		
 		{
 			ret = -E_INVAL;
 			if (pid_store == NULL
-			    || copy_to_user(mm, pid_store, &pid, sizeof(int))) {
-				if (copy_to_user
-				    (mm, event_store, &event, sizeof(int))) {
+			    || memcpy(pid_store, &pid, sizeof(int))) {
+				if (memcpy(event_store, &event, sizeof(int))) {
 					ret = 0;
 				}
 			}
 		}
-		unlock_mm(mm);
+		
 		return ret;
 	}
 	return ipc_check_timeout(timeout, saved_ticks);

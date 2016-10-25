@@ -28,9 +28,8 @@ src/user-ucore/_initial
 .Xil/
 
 # other
-success.txt
-delete_part.txt
 *.backup
+*.txt
 
 # save vscode setting
 !.vscode/

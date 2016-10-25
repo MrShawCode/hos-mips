@@ -1,7 +1,6 @@
 #include <ulib.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <malloc.h>
 
 #define scprintf(...)               \
     do {                            \
@@ -45,9 +44,6 @@ void init(void)
 		failed();
 	}
 	if ((sem_count = sem_init(1)) < 0 || (sem_write = sem_init(1)) < 0) {
-		failed();
-	}
-	if ((pCount = shmem_malloc(sizeof(int))) == NULL) {
 		failed();
 	}
 	*pCount = 0;

@@ -1,20 +1,15 @@
 #include <types.h>
-#include <string.h>
 #include <syscall.h>
-#include <malloc.h>
 #include <stat.h>
 #include <dirent.h>
 #include <file.h>
 #include <dir.h>
 #include <error.h>
 #include <unistd.h>
+DIR dir, *dirp=&dir;
 
 DIR *opendir(const char *path)
 {
-	DIR *dirp;
-	if ((dirp = malloc(sizeof(DIR))) == NULL) {
-		return NULL;
-	}
 	if ((dirp->fd = open(path, O_RDONLY)) < 0) {
 		goto failed;
 	}
@@ -26,7 +21,6 @@ DIR *opendir(const char *path)
 	return dirp;
 
 failed:
-	free(dirp);
 	return NULL;
 }
 
@@ -41,7 +35,6 @@ struct dirent *readdir(DIR * dirp)
 void closedir(DIR * dirp)
 {
 	close(dirp->fd);
-	free(dirp);
 }
 
 int chdir(const char *path)

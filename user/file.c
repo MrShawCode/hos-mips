@@ -1,9 +1,7 @@
 #include <types.h>
-#include <string.h>
 #include <syscall.h>
 #include <stdio.h>
 #include <stat.h>
-#include <malloc.h>
 #include <error.h>
 #include <unistd.h>
 

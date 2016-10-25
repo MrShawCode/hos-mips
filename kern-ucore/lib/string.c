@@ -1,6 +1,5 @@
 #include <string.h>
 #include <pmm.h>
-#include <string.h>
 #include <arch.h>
 
 /* *
@@ -393,4 +392,61 @@ char *stradd(const char *src1, const char *src2)
 		*dst = '\0';
 	}
 	return ret;
+}
+
+bool copy_string(char *dst, const char *src, size_t maxn)
+{
+	size_t alen, part =
+	    ROUNDDOWN_2N((uintptr_t) src + PGSIZE, PGSHIFT) - (uintptr_t) src;
+	while (1) {
+		if (part > maxn) {
+			part = maxn;
+		}
+		if ((alen = strnlen(src, part)) < part) {
+			memcpy(dst, src, alen + 1);
+			return 1;
+		}
+		if (part == maxn) {
+			return 0;
+		}
+		memcpy(dst, src, part);
+		dst += part, src += part, maxn -= part;
+		part = PGSIZE;
+	}
+}
+
+/* *
+ * stricmp - compares the string @s1 and @s2 case insensitive
+ * @s1:      string to be compared
+ * @s2:      string to be compared
+ * This function starts comparing the first character of each string. If
+ * they are equal to each other, it continues with the following pairs until
+ * the characters differ or until a terminanting null-character is reached.
+ *
+ * Returns an integral value indicating the relationship between the strings:
+ * - A zero value indicates that both strings are equal;
+ * - A value greater than zero indicates that the first character that does
+ *   not match has a greater value in @s1 than in @s2;
+ * - And a value less than zero indicates the opposite.
+ * - All of the comparing is case insensitive
+ * */
+int stricmp(const char *s1, const char *s2)
+{
+	//while (*s1 != '\0')&& *s1 == *s2) {
+	//    s1 ++, s2 ++;
+	//}
+	char t1, t2;
+	while (*s1 != '\0') {
+		t1 = ((*s1 > 'Z') ? (*s1 - 32) : *s1);
+		t2 = ((*s2 > 'Z') ? (*s2 - 32) : *s2);
+
+		if (t1 == t2) {
+			s1++, s2++;
+		} else {
+			break;
+		}
+	}
+	t1 = ((*s1 > 'Z') ? (*s1 - 32) : *s1);
+	t2 = ((*s2 > 'Z') ? (*s2 - 32) : *s2);
+	return (int)((unsigned char)t1 - (unsigned char)t2);
 }

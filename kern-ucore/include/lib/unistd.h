@@ -17,10 +17,6 @@
 #define SYS_kill            12
 #define SYS_gettime         17
 #define SYS_getpid          18
-#define SYS_brk             19
-#define SYS_mmap            20
-#define SYS_munmap          21
-#define SYS_shmem           22
 #define SYS_putc            30
 #define SYS_pgdir           31
 #define SYS_sem_init        40
@@ -57,7 +53,6 @@
 
 /* chenyh 2012/7 */
 #define SYS_ioctl           142
-#define SYS_linux_mmap      143
 #define SYS_linux_tkill     144
 #define SYS_linux_sigaction 145
 #define SYS_linux_kill      146

@@ -1,7 +1,6 @@
 #include <types.h>
 #include <string.h>
 #include <pmm.h>
-#include <vmm.h>
 #include <proc.h>
 #include <vfs.h>
 #include <file.h>
@@ -17,17 +16,16 @@
 
 static int copy_path(char **to, const char *from)
 {
-	struct mm_struct *mm = pls_read(current)->mm;
 	char *buffer;
 	if ((buffer = kmalloc(FS_MAX_FPATH_LEN + 1)) == NULL) {
 		return -E_NO_MEM;
 	}
-	lock_mm(mm);
-	if (!copy_string(mm, buffer, from, FS_MAX_FPATH_LEN + 1)) {
-		unlock_mm(mm);
+	
+	if (!copy_string(buffer, from, FS_MAX_FPATH_LEN + 1)) {
+		
 		goto failed_cleanup;
 	}
-	unlock_mm(mm);
+	
 	*to = buffer;
 	return 0;
 
@@ -56,7 +54,6 @@ int sysfile_close(int fd)
 int sysfile_read(int fd, void *base, size_t len)
 {
 	int ret = 0;
-	struct mm_struct *mm = pls_read(current)->mm;
 	if (len == 0) {
 		return 0;
 	}
@@ -83,9 +80,9 @@ int sysfile_read(int fd, void *base, size_t len)
 		}
 		ret = file_read(fd, buffer, alen, &alen);
 		if (alen != 0) {
-			lock_mm(mm);
+			
 			{
-				if (copy_to_user(mm, base, buffer, alen)) {
+				if (memcpy(base, buffer, alen)) {
 					assert(len >= alen);
 					base += alen, len -= alen, copied +=
 					    alen;
@@ -93,7 +90,7 @@ int sysfile_read(int fd, void *base, size_t len)
 					ret = -E_INVAL;
 				}
 			}
-			unlock_mm(mm);
+			
 		}
 		if (ret != 0 || alen == 0) {
 			goto out;
@@ -111,7 +108,6 @@ out:
 int sysfile_write(int fd, void *base, size_t len)
 {
 	int ret = 0;
-	struct mm_struct *mm = pls_read(current)->mm;
 	if (len == 0) {
 		return 0;
 	}
@@ -138,13 +134,11 @@ int sysfile_write(int fd, void *base, size_t len)
 		if ((alen = IOBUF_SIZE) > len) {
 			alen = len;
 		}
-		lock_mm(mm);
-		{
-			if (!copy_from_user(mm, buffer, base, alen, 0)) {
-				ret = -E_INVAL;
-			}
+		
+		if (!memcpy(buffer, base, alen)) {
+			ret = -E_INVAL;
 		}
-		unlock_mm(mm);
+		
 		if (ret == 0) {
 			ret = file_write(fd, buffer, alen, &alen);
 			if (alen != 0) {
@@ -171,14 +165,12 @@ int sysfile_writev(int fd, struct iovec __user * iov, int iovcnt)
 	kprintf("writev: fd=%08x iov=%08x iovcnt=%d\n\r", fd, iov, iovcnt);
 	struct iovec *tv;
 	int rcode = 0, count = 0, i;
-	struct mm_struct *mm = pls_read(current)->mm;
 	for (i = 0; i < iovcnt; ++i) {
 		char *pbase;
 		size_t plen;
 
-		copy_from_user(mm, &pbase, &(iov[i].iov_base), sizeof(char *),
-			       0);
-		copy_from_user(mm, &plen, &(iov[i].iov_len), sizeof(size_t), 0);
+		memcpy(&pbase, &(iov[i].iov_base), sizeof(char *));
+		memcpy(&plen, &(iov[i].iov_len), sizeof(size_t));
 
 		rcode = sysfile_write(fd, pbase, plen);
 		if (rcode < 0)
@@ -198,26 +190,21 @@ int sysfile_seek(int fd, off_t pos, int whence)
 
 int sysfile_fstat(int fd, struct stat *__stat)
 {
-	struct mm_struct *mm = pls_read(current)->mm;
 	int ret;
 	struct stat __local_stat, *stat = &__local_stat;
 	if ((ret = file_fstat(fd, stat)) != 0) {
 		return ret;
 	}
 
-	lock_mm(mm);
-	{
-		if (!copy_to_user(mm, __stat, stat, sizeof(struct stat))) {
-			ret = -E_INVAL;
-		}
+	if (!memcpy(__stat, stat, sizeof(struct stat))) {
+		ret = -E_INVAL;
 	}
-	unlock_mm(mm);
+
 	return ret;
 }
 
 int sysfile_linux_fstat(int fd, struct linux_stat __user * buf)
 {
-	struct mm_struct *mm = pls_read(current)->mm;
 	int ret;
 	struct stat __local_stat, *kstat = &__local_stat;
 	if ((ret = file_fstat(fd, kstat)) != 0) {
@@ -237,20 +224,19 @@ int sysfile_linux_fstat(int fd, struct linux_stat __user * buf)
 	kls->st_size = kstat->st_size;
 
 	ret = 0;
-	lock_mm(mm);
+	
 	{
-		if (!copy_to_user(mm, buf, kls, sizeof(struct linux_stat))) {
+		if (!memcpy(buf, kls, sizeof(struct linux_stat))) {
 			ret = -1;
 		}
 	}
-	unlock_mm(mm);
+	
 	kfree(kls);
 	return ret;
 }
 
 int sysfile_linux_fstat64(int fd, struct linux_stat64 __user * buf)
 {
-	struct mm_struct *mm = pls_read(current)->mm;
 	int ret;
 	struct stat __local_stat, *kstat = &__local_stat;
 	if ((ret = file_fstat(fd, kstat)) != 0) {
@@ -270,13 +256,13 @@ int sysfile_linux_fstat64(int fd, struct linux_stat64 __user * buf)
 	kls->st_size = kstat->st_size;
 
 	ret = 0;
-	lock_mm(mm);
+	
 	{
-		if (!copy_to_user(mm, buf, kls, sizeof(struct linux_stat64))) {
+		if (!memcpy(buf, kls, sizeof(struct linux_stat64))) {
 			ret = -1;
 		}
 	}
-	unlock_mm(mm);
+	
 	kfree(kls);
 	return ret;
 }
@@ -386,54 +372,40 @@ int sysfile_unlink(const char *__path)
 
 int sysfile_getcwd(char *buf, size_t len)
 {
-	struct mm_struct *mm = pls_read(current)->mm;
 	if (len == 0) {
 		return -E_INVAL;
 	}
 
-	lock_mm(mm);
-	{
-		if (user_mem_check(mm, (uintptr_t) buf, len, 1)) {
-			struct iobuf __iob, *iob =
-			    iobuf_init(&__iob, buf, len, 0);
-			vfs_getcwd(iob);
-		}
-	}
-	unlock_mm(mm);
+	struct iobuf __iob, *iob =
+		iobuf_init(&__iob, buf, len, 0);
+	vfs_getcwd(iob);
+
 	return 0;
 }
 
 int sysfile_getdirentry(int fd, struct dirent *__direntp, uint32_t * len_store)
 {
-	struct mm_struct *mm = pls_read(current)->mm;
 	struct dirent *direntp;
 	if ((direntp = kmalloc(sizeof(struct dirent))) == NULL) {
 		return -E_NO_MEM;
 	}
 
 	int ret = 0;
-	lock_mm(mm);
-	{
-		if (!copy_from_user
-		    (mm, &(direntp->d_off), &(__direntp->d_off),
-		     sizeof(direntp->d_off), 1)) {
-			ret = -E_INVAL;
-		}
+	
+	if (!memcpy(&(direntp->d_off), &(__direntp->d_off),
+			sizeof(direntp->d_off))) {
+		ret = -E_INVAL;
 	}
-	unlock_mm(mm);
+	
 
 	if (ret != 0 || (ret = file_getdirentry(fd, direntp)) != 0) {
 		goto out;
 	}
 
-	lock_mm(mm);
-	{
-		if (!copy_to_user
-		    (mm, __direntp, direntp, sizeof(struct dirent))) {
-			ret = -E_INVAL;
-		}
+	if (!memcpy(__direntp, direntp, sizeof(struct dirent))) {
+		ret = -E_INVAL;
 	}
-	unlock_mm(mm);
+	
 	if (len_store) {
 		*len_store = (direntp->d_name[0]) ? direntp->d_reclen : 0;
 	}
@@ -442,59 +414,6 @@ out:
 	return ret;
 }
 
-#if 0
-int sysfile_linux_getdents(int fd, struct linux_dirent *__dir, uint32_t count)
-{
-	struct mm_struct *mm = pls_read(current)->mm;
-	struct linux_dirent *dir;
-	int ret = 0;
-	if (count < sizeof(struct linux_dirent))
-		return -1;
-
-	if ((dir = kmalloc(sizeof(struct linux_dirent))) == NULL) {
-		goto out;
-	}
-	memset(dir, 0, sizeof(struct linux_dirent));
-
-	lock_mm(mm);
-	{
-		if (!copy_from_user
-		    (mm, &(dir->d_off), &(__dir->d_off), sizeof(dir->d_off),
-		     1)) {
-			ret = -1;
-		}
-	}
-	unlock_mm(mm);
-	direntp->offset = dir->d_off;
-
-	if (ret != 0 || (ret = file_getdirentry(fd, direntp)) != 0) {
-		goto put_linuxdir;
-	}
-
-	dir->d_reclen = sizeof(struct linux_dirent);
-	dir->d_off = direntp->offset;
-	dir->d_ino = 1;
-	strcpy(dir->d_name, direntp->name);
-
-	lock_mm(mm);
-	{
-		if (!copy_to_user(mm, __dir, dir, sizeof(struct linux_dirent))) {
-			ret = -1;
-		}
-	}
-	unlock_mm(mm);
-	ret = dir->d_reclen;
-	/* done */
-	if (!dir->d_name[0])
-		ret = 0;
-put_linuxdir:
-	kfree(dir);
-out:
-	kfree(direntp);
-	return ret;
-}
-#endif
-
 int sysfile_dup(int fd1, int fd2)
 {
 	return file_dup(fd1, fd2);
@@ -502,19 +421,15 @@ int sysfile_dup(int fd1, int fd2)
 
 int sysfile_pipe(int *fd_store)
 {
-	struct mm_struct *mm = pls_read(current)->mm;
 	int ret, fd[2];
-	if (!user_mem_check(mm, (uintptr_t) fd_store, sizeof(fd), 1)) {
-		return -E_INVAL;
-	}
 	if ((ret = file_pipe(fd)) == 0) {
-		lock_mm(mm);
+		
 		{
-			if (!copy_to_user(mm, fd_store, fd, sizeof(fd))) {
+			if (!memcpy(fd_store, fd, sizeof(fd))) {
 				ret = -E_INVAL;
 			}
 		}
-		unlock_mm(mm);
+		
 		if (ret != 0) {
 			file_close(fd[0]), file_close(fd[1]);
 		}
@@ -543,16 +458,4 @@ int sysfile_ioctl(int fd, unsigned int cmd, unsigned long arg)
 		return -E_INVAL;
 	}
 	return linux_devfile_ioctl(fd, cmd, arg);
-}
-
-void *sysfile_linux_mmap2(void *addr, size_t len, int prot, int flags,
-			  int fd, size_t pgoff)
-{
-	if (!file_testfd(fd, 1, 0)) {
-		return MAP_FAILED;
-	}
-	if (__is_linux_devfile(fd)) {
-		return linux_devfile_mmap2(addr, len, prot, flags, fd, pgoff);
-	}
-	return MAP_FAILED;
 }

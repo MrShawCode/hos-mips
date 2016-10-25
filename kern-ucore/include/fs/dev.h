@@ -38,8 +38,6 @@ struct device {
 			      size_t count, size_t * offset);
 	/* new ioctl */
 	int (*d_linux_ioctl) (struct device * dev, unsigned int, unsigned long);
-	void *(*d_linux_mmap) (struct device * dev, void *addr, size_t len,
-			       int unused1, int unused2, size_t off);
 
 	int (*d_open) (struct device * dev, uint32_t open_flags);
 	int (*d_close) (struct device * dev);

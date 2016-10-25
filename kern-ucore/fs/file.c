@@ -12,8 +12,6 @@
 #include <error.h>
 #include <assert.h>
 
-#include <vmm.h>
-
 #define testfd(fd)                          ((fd) >= 0 && (fd) < FS_STRUCT_NENTRY)
 
 static struct file *get_filemap(void)
@@ -515,20 +513,4 @@ int linux_devfile_ioctl(int fd, unsigned int cmd, unsigned long arg)
 	ret = dev->d_linux_ioctl(dev, cmd, arg);
 	filemap_release(file);
 	return ret;
-}
-
-void *linux_devfile_mmap2(void *addr, size_t len, int prot, int flags, int fd,
-			  size_t pgoff)
-{
-	int ret = -E_INVAL;
-	struct file *file;
-	if ((ret = fd2file(fd, &file)) != 0) {
-		return NULL;
-	}
-	filemap_acquire(file);
-	struct device *dev = vop_info(file->node, device);
-	assert(dev);
-	void *r = dev->d_linux_mmap(dev, addr, len, prot, flags, pgoff);
-	filemap_release(file);
-	return r;
 }

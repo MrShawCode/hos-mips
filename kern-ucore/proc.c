@@ -5,7 +5,6 @@
 #include <error.h>
 #include <sched.h>
 #include <elf.h>
-#include <vmm.h>
 #include <trap.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -81,8 +80,6 @@ struct proc_struct *initproc;
 
 // the process set's list
 list_entry_t proc_list;
-// the process set's mm's list
-list_entry_t proc_mm_list;
 
 #define HASH_SHIFT          10
 #define HASH_LIST_SIZE      (1 << HASH_SHIFT)
@@ -106,7 +103,6 @@ struct proc_struct *alloc_proc(void)
 		proc->kstack = 0;
 		proc->need_resched = 0;
 		proc->parent = NULL;
-		proc->mm = NULL;
 		proc->tf = NULL;
 		proc->flags = 0;
 		proc->need_resched = 0;
@@ -122,6 +118,7 @@ struct proc_struct *alloc_proc(void)
 		event_box_init(&(proc->event_box));
 		proc->fs_struct = NULL;
 		proc->sem_queue = sem_queue_create();
+		proc->pgdir = NULL;
 	}
 	return proc;
 }
@@ -215,7 +212,7 @@ void proc_run(struct proc_struct *proc)
 		{
 			pls_write(current, proc);
 			load_rsp0(next->kstack + KSTACKSIZE);
-			mp_set_mm_pagetable(next->mm);
+			set_pagetable(next->pgdir);
 			switch_to(&(prev->context), &(next->context));
 		}
 		local_intr_restore(intr_flag);
@@ -268,8 +265,7 @@ static void put_kstack(struct proc_struct *proc)
 
 // setup_pgdir - alloc one page as PDT
 // XXX, PDT size != PGSIZE!!!
-#ifndef ARCH_ARM
-static int setup_pgdir(struct mm_struct *mm)
+static int setup_pgdir(pgd_t **set_pgdir)
 {
 	struct Page *page;
 	if ((page = alloc_page()) == NULL) {
@@ -278,42 +274,15 @@ static int setup_pgdir(struct mm_struct *mm)
 	pgd_t *pgdir = page2kva(page);
 	memcpy(pgdir, init_pgdir_get(), PGSIZE);
 	map_pgdir(pgdir);
-	mm->pgdir = pgdir;
+	*set_pgdir = pgdir;
 	return 0;
 }
 
 // put_pgdir - free the memory space of PDT
-static void put_pgdir(struct mm_struct *mm)
+static void put_pgdir(pgd_t *pgdir)
 {
-	free_page(kva2page(mm->pgdir));
+	free_page(kva2page(pgdir));
 }
-#else
-#warning ARM PDT is 16k
-static int setup_pgdir(struct mm_struct *mm)
-{
-	struct Page *page;
-	/* 4 * 4K = 16K */
-#warning dirty hack
-	if ((page = alloc_pages(8)) == NULL) {
-		return -E_NO_MEM;
-	}
-	pgd_t *pgdir_start = page2kva(page);
-	pgd_t *pgdir = ROUNDUP(pgdir_start, 4 * PGSIZE);
-	memcpy(pgdir, init_pgdir_get(), 4 * PGSIZE);
-
-	map_pgdir(pgdir);
-	mm->pgdir = pgdir;
-	mm->pgdir_alloc_addr = pgdir_start;
-	return 0;
-}
-
-// put_pgdir - free the memory space of PDT
-static void put_pgdir(struct mm_struct *mm)
-{
-	assert(mm->pgdir_alloc_addr);
-	free_pages(kva2page(mm->pgdir_alloc_addr), 8);
-}
-#endif
 
 // de_thread - delete this thread "proc" from thread_group list
 static void de_thread(struct proc_struct *proc)
@@ -326,75 +295,12 @@ static void de_thread(struct proc_struct *proc)
 		}
 		local_intr_restore(intr_flag);
 	}
-
-	de_thread_arch_hook(proc);
-}
-
-void de_thread_arch_hook(struct proc_struct *proc)
-{
 }
 
 // next_thread - get the next thread "proc" from thread_group list
 static struct proc_struct *next_thread(struct proc_struct *proc)
 {
 	return le2proc(list_next(&(proc->thread_group)), thread_group);
-}
-
-// copy_mm - process "proc" duplicate OR share process "current"'s mm according clone_flags
-//         - if clone_flags & CLONE_VM, then "share" ; else "duplicate"
-static int copy_mm(uint32_t clone_flags, struct proc_struct *proc)
-{
-	struct mm_struct *mm, *oldmm = current->mm;
-
-	/* current is a kernel thread */
-	if (oldmm == NULL) {
-		return 0;
-	}
-	if (clone_flags & CLONE_VM) {
-		mm = oldmm;
-		goto good_mm;
-	}
-
-	int ret = -E_NO_MEM;
-	if ((mm = mm_create()) == NULL) {
-		goto bad_mm;
-	}
-	if (setup_pgdir(mm) != 0) {
-		goto bad_pgdir_cleanup_mm;
-	}
-
-	lock_mm(oldmm);
-	{
-		ret = dup_mmap(mm, oldmm);
-	}
-	unlock_mm(oldmm);
-
-	if (ret != 0) {
-		goto bad_dup_cleanup_mmap;
-	}
-
-good_mm:
-	if (mm != oldmm) {
-		mm->brk_start = oldmm->brk_start;
-		mm->brk = oldmm->brk;
-		bool intr_flag;
-		local_intr_save(intr_flag);
-		{
-			list_add(&(proc_mm_list), &(mm->proc_mm_link));
-		}
-		local_intr_restore(intr_flag);
-	}
-	mm_count_inc(mm);
-	proc->mm = mm;
-	set_pgdir(proc, mm->pgdir);
-	return 0;
-bad_dup_cleanup_mmap:
-	exit_mmap(mm);
-	put_pgdir(mm);
-bad_pgdir_cleanup_mm:
-	mm_destroy(mm);
-bad_mm:
-	return ret;
 }
 
 static int copy_sem(uint32_t clone_flags, struct proc_struct *proc)
@@ -556,6 +462,23 @@ bad_fs_struct:
 	return ret;
 }
 
+static int copy_pgdir(uint32_t clone_flags, struct proc_struct *proc) {
+	pde_t *old_pgdir = current->pgdir;
+	pde_t *pgdir;
+    /* current is a kernel thread */
+	if(current->pgdir == NULL)
+		return 0;
+
+    int ret = -E_NO_MEM;
+    if (setup_pgdir(&pgdir) != 0)
+		return -1;
+
+    proc->pgdir = pgdir;
+    proc->cr3 = PADDR(pgdir);
+	copy_range(pgdir, old_pgdir, USERBASE, USERTOP, 0);
+	return 0;
+}
+
 static void put_fs(struct proc_struct *proc)
 {
 	struct fs_struct *fs_struct = proc->fs_struct;
@@ -611,14 +534,14 @@ int do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf)
 	if (copy_fs(clone_flags, proc) != 0) {
 		goto bad_fork_cleanup_sem;
 	}
+	if (copy_pgdir(clone_flags, proc) != 0){
+		goto bad_fork_cleanup_proc;
+	}
 	if (copy_signal(clone_flags, proc) != 0) {
 		goto bad_fork_cleanup_fs;
 	}
 	if (copy_sighand(clone_flags, proc) != 0) {
 		goto bad_fork_cleanup_signal;
-	}
-	if (copy_mm(clone_flags, proc) != 0) {
-		goto bad_fork_cleanup_sighand;
 	}
 	if (copy_thread(clone_flags, proc, stack, tf) != 0) {
 		goto bad_fork_cleanup_sighand;
@@ -676,22 +599,11 @@ static int __do_exit(void)
 		panic("initproc exit.\n\r");
 	}
 
-	struct mm_struct *mm = current->mm;
-	if (mm != NULL) {
-		mm->lapic = -1;
-		mp_set_mm_pagetable(NULL);
-		if (mm_count_dec(mm) == 0) {
-			exit_mmap(mm);
-			put_pgdir(mm);
-			bool intr_flag;
-			local_intr_save(intr_flag);
-			{
-				list_del(&(mm->proc_mm_link));
-			}
-			local_intr_restore(intr_flag);
-			mm_destroy(mm);
-		}
-		current->mm = NULL;
+	pde_t *pgdir = current->pgdir;
+	if (pgdir != NULL) {
+		set_pagetable(NULL);
+		put_pgdir(pgdir);
+		current->pgdir = NULL;
 	}
 	put_sighand(current);
 	put_signal(current);
@@ -777,54 +689,21 @@ static int load_icode_read(int fd, void *buf, size_t len, off_t offset)
 	return 0;
 }
 
-//#ifdef UCONFIG_BIONIC_LIBC
 static int
-map_ph(int fd, struct proghdr *ph, struct mm_struct *mm, uint32_t * pbias,
-       uint32_t linker)
+map_ph(int fd, struct proghdr *ph,  pde_t *pgdir, uint32_t linker)
 {
 	int ret = 0;
 	struct Page *page;
-	uint32_t vm_flags = 0;
-	uint32_t bias = 0;
 	pte_perm_t perm = 0;
 	ptep_set_u_read(&perm);
 
-	if (ph->p_flags & ELF_PF_X)
-		vm_flags |= VM_EXEC;
-	if (ph->p_flags & ELF_PF_W)
-		vm_flags |= VM_WRITE;
-	if (ph->p_flags & ELF_PF_R)
-		vm_flags |= VM_READ;
-
-	if (vm_flags & VM_WRITE)
-		ptep_set_u_write(&perm);
-
-	if (pbias) {
-		bias = *pbias;
-	}
-	if (!bias && !ph->p_va) {
-		bias = get_unmapped_area(mm, ph->p_memsz + PGSIZE);
-		bias = ROUNDUP(bias, PGSIZE);
-		if (pbias)
-			*pbias = bias;
-	}
-
-	if ((ret =
-	     mm_map(mm, ph->p_va + bias, ph->p_memsz, vm_flags, NULL)) != 0) {
-		goto bad_cleanup_mmap;
-	}
-
-	if (!linker && mm->brk_start < ph->p_va + bias + ph->p_memsz) {
-		mm->brk_start = ph->p_va + bias + ph->p_memsz;
-	}
-
 	off_t offset = ph->p_offset;
 	size_t off, size;
-	uintptr_t start = ph->p_va + bias, end, la = ROUNDDOWN(start, PGSIZE);
+	uintptr_t start = ph->p_va , end, la = ROUNDDOWN(start, PGSIZE);
 
-	end = ph->p_va + bias + ph->p_filesz;
+	end = ph->p_va + ph->p_filesz;
 	while (start < end) {
-		if ((page = pgdir_alloc_page(mm->pgdir, la, perm)) == NULL) {
+		if ((page = pgdir_alloc_page(pgdir, la, perm)) == NULL) {
 			ret = -E_NO_MEM;
 			goto bad_cleanup_mmap;
 		}
@@ -840,7 +719,7 @@ map_ph(int fd, struct proghdr *ph, struct mm_struct *mm, uint32_t * pbias,
 		start += size, offset += size;
 	}
 
-	end = ph->p_va + bias + ph->p_memsz;
+	end = ph->p_va + ph->p_memsz;
 
 	if (start < la) {
 		if (start == end) {
@@ -857,7 +736,7 @@ map_ph(int fd, struct proghdr *ph, struct mm_struct *mm, uint32_t * pbias,
 	}
 
 	while (start < end) {
-		if ((page = pgdir_alloc_page(mm->pgdir, la, perm)) == NULL) {
+		if ((page = pgdir_alloc_page(pgdir, la, perm)) == NULL) {
 			ret = -E_NO_MEM;
 			goto bad_cleanup_mmap;
 		}
@@ -874,32 +753,16 @@ bad_cleanup_mmap:
 	return ret;
 }
 
-//#endif //UCONFIG_BIONIC_LIBC
-
 static int load_icode(int fd, int argc, char **kargv, int envc, char **kenvp)
 {
 	assert(argc >= 0 && argc <= EXEC_MAX_ARG_NUM);
 	assert(envc >= 0 && envc <= EXEC_MAX_ENV_NUM);
-	if (current->mm != NULL) {
-		panic("load_icode: current->mm must be empty.\n\r");
-	}
 
 	int ret = -E_NO_MEM;
 
-//#ifdef UCONFIG_BIONIC_LIBC
-	uint32_t real_entry;
-//#endif //UCONFIG_BIONIC_LIBC
-
-	struct mm_struct *mm;
-	if ((mm = mm_create()) == NULL) {
-		goto bad_mm;
-	}
-
-	if (setup_pgdir(mm) != 0) {
+	if (setup_pgdir(&current->pgdir) != 0) {
 		goto bad_pgdir_cleanup_mm;
 	}
-
-	mm->brk_start = 0;
 
 	struct Page *page;
 
@@ -912,32 +775,18 @@ static int load_icode(int fd, int argc, char **kargv, int envc, char **kenvp)
 		ret = -E_INVAL_ELF;
 		goto bad_elf_cleanup_pgdir;
 	}
-//#ifdef UCONFIG_BIONIC_LIBC
-	real_entry = elf->e_entry;
 
 	uint32_t load_address, load_address_flag = 0;
-//#endif //UCONFIG_BIONIC_LIBC
 
 	struct proghdr __ph, *ph = &__ph;
 	uint32_t vm_flags, phnum;
-	pte_perm_t perm = 0;
 
-//#ifdef UCONFIG_BIONIC_LIBC
-	uint32_t is_dynamic = 0, interp_idx;
-	uint32_t bias = 0;
-//#endif //UCONFIG_BIONIC_LIBC
 	for (phnum = 0; phnum < elf->e_phnum; phnum++) {
 		off_t phoff = elf->e_phoff + sizeof(struct proghdr) * phnum;
 		if ((ret =
 		     load_icode_read(fd, ph, sizeof(struct proghdr),
 				     phoff)) != 0) {
 			goto bad_cleanup_mmap;
-		}
-
-		if (ph->p_type == ELF_PT_INTERP) {
-			is_dynamic = 1;
-			interp_idx = phnum;
-			continue;
 		}
 
 		if (ph->p_type != ELF_PT_LOAD) {
@@ -948,130 +797,97 @@ static int load_icode(int fd, int argc, char **kargv, int envc, char **kenvp)
 			goto bad_cleanup_mmap;
 		}
 
-		if (ph->p_va == 0 && !bias) {
-			bias = 0x30800000;
-		}
-
-		if ((ret = map_ph(fd, ph, mm, &bias, 0)) != 0) {
-			kprintf("load address: 0x%08x size: %d\n\r", ph->p_va,
+		if ((ret = map_ph(fd, ph, current->pgdir, 0)) != 0) {
+			kprintf("load address: 0x%08x size: %d\n", ph->p_va,
 				ph->p_memsz);
 			goto bad_cleanup_mmap;
 		}
+		        off_t offset = ph->p_offset;
+        size_t off, size;
+        uintptr_t start = ph->p_va, end, la = ROUNDDOWN(start, PGSIZE);
 
-		if (load_address_flag == 0)
-			load_address = ph->p_va + bias;
-		++load_address_flag;
+        ret = -E_NO_MEM;
+		uint32_t perm = PTE_U;
+		if (ph->p_flags & ELF_PF_W)
+			perm |= PTE_W;
+        end = ph->p_va + ph->p_filesz;
+        while (start < end) {
+            if ((page = pgdir_alloc_page(current->pgdir, la, perm)) == NULL) {
+                ret = -E_NO_MEM;
+                goto bad_cleanup_mmap;
+            }
+            off = start - la, size = PGSIZE - off, la += PGSIZE;
+            if (end < la) {
+                size -= la - end;
+            }
+            if ((ret = load_icode_read(fd, page2kva(page) + off, size, offset)) != 0) {
+                goto bad_cleanup_mmap;
+            }
+            start += size, offset += size;
+        }
+        end = ph->p_va + ph->p_memsz;
+
+        if (start < la) {
+            /* ph->p_memsz == ph->p_filesz */
+            if (start == end) {
+                continue ;
+            }
+            off = start + PGSIZE - la, size = PGSIZE - off;
+            if (end < la) {
+                size -= la - end;
+            }
+            memset(page2kva(page) + off, 0, size);
+            start += size;
+            assert((end < la && start == end) || (end >= la && start == la));
+        }
+        while (start < end) {
+            if ((page = pgdir_alloc_page(current->pgdir, la, perm)) == NULL) {
+                ret = -E_NO_MEM;
+                goto bad_cleanup_mmap;
+            }
+            off = start - la, size = PGSIZE - off, la += PGSIZE;
+            if (end < la) {
+                size -= la - end;
+            }
+            memset(page2kva(page) + off, 0, size);
+            start += size;
+        }
 	}
-
-	mm->brk_start = mm->brk = ROUNDUP(mm->brk_start, PGSIZE);
-
-	/* setup user stack */
-	vm_flags = VM_READ | VM_WRITE | VM_STACK;
-	if ((ret =
-	     mm_map(mm, USTACKTOP - USTACKSIZE, USTACKSIZE, vm_flags,
-		    NULL)) != 0) {
-		goto bad_cleanup_mmap;
-	}
-
-	if (is_dynamic) {
-		elf->e_entry += bias;
-
-		bias = 0;
-
-		off_t phoff =
-		    elf->e_phoff + sizeof(struct proghdr) * interp_idx;
-		if ((ret =
-		     load_icode_read(fd, ph, sizeof(struct proghdr),
-				     phoff)) != 0) {
-			goto bad_cleanup_mmap;
-		}
-
-		char *interp_path = (char *)kmalloc(ph->p_filesz);
-		load_icode_read(fd, interp_path, ph->p_filesz, ph->p_offset);
-
-		int interp_fd = sysfile_open(interp_path, O_RDONLY);
-		assert(interp_fd >= 0);
-		struct elfhdr interp___elf, *interp_elf = &interp___elf;
-		assert((ret =
-			load_icode_read(interp_fd, interp_elf,
-					sizeof(struct elfhdr), 0)) == 0);
-		assert(interp_elf->e_magic == ELF_MAGIC);
-
-		struct proghdr interp___ph, *interp_ph = &interp___ph;
-		uint32_t interp_phnum;
-		uint32_t va_min = 0xffffffff, va_max = 0;
-		for (interp_phnum = 0; interp_phnum < interp_elf->e_phnum;
-		     ++interp_phnum) {
-			off_t interp_phoff =
-			    interp_elf->e_phoff +
-			    sizeof(struct proghdr) * interp_phnum;
-			assert((ret =
-				load_icode_read(interp_fd, interp_ph,
-						sizeof(struct proghdr),
-						interp_phoff)) == 0);
-			if (interp_ph->p_type != ELF_PT_LOAD) {
-				continue;
-			}
-			if (va_min > interp_ph->p_va)
-				va_min = interp_ph->p_va;
-			if (va_max < interp_ph->p_va + interp_ph->p_memsz)
-				va_max = interp_ph->p_va + interp_ph->p_memsz;
-		}
-
-		bias = get_unmapped_area(mm, va_max - va_min + 1 + PGSIZE);
-		bias = ROUNDUP(bias, PGSIZE);
-
-		for (interp_phnum = 0; interp_phnum < interp_elf->e_phnum;
-		     ++interp_phnum) {
-			off_t interp_phoff =
-			    interp_elf->e_phoff +
-			    sizeof(struct proghdr) * interp_phnum;
-			assert((ret =
-				load_icode_read(interp_fd, interp_ph,
-						sizeof(struct proghdr),
-						interp_phoff)) == 0);
-			if (interp_ph->p_type != ELF_PT_LOAD) {
-				continue;
-			}
-			assert((ret =
-				map_ph(interp_fd, interp_ph, mm, &bias,
-				       1)) == 0);
-		}
-
-		real_entry = interp_elf->e_entry + bias;
-
-		sysfile_close(interp_fd);
-		kfree(interp_path);
-	}
-
 	sysfile_close(fd);
 
-	bool intr_flag;
-	local_intr_save(intr_flag);
-	{
-		list_add(&(proc_mm_list), &(mm->proc_mm_link));
+	/* setup user stack */
+	uintptr_t i = ROUNDDOWN(USTACKTOP - USTACKSIZE, PGSIZE);
+	for(;i < ROUNDUP(USTACKTOP - USTACKSIZE + USTACKSIZE, PGSIZE);i+=PGSIZE){
+		assert(pgdir_alloc_page(current->pgdir, i, PTE_USER) != NULL);
 	}
-	local_intr_restore(intr_flag);
-	mm_count_inc(mm);
-	current->mm = mm;
-	set_pgdir(current, mm->pgdir);
-	mm->lapic = pls_read(lapic_id);
-	mp_set_mm_pagetable(mm);
 
-	if (!is_dynamic) {
-		real_entry += bias;
+	set_pgdir(current, current->pgdir);
+	lcr3(PADDR(current->pgdir));
+
+	uintptr_t stacktop = USTACKTOP - argc * PGSIZE;
+	char **uargv = (char **)(stacktop - argc * sizeof(char *));
+	for (i = 0; i < argc; i++) {
+		uargv[i] = strcpy((char *)(stacktop + i * PGSIZE), kargv[i]);
 	}
-	if (init_new_context(current, elf, argc, kargv, envc, kenvp) < 0)
-		goto bad_cleanup_mmap;
+	struct trapframe *tf = current->tf;
+	memset(tf, 0, sizeof(struct trapframe));
+	tf->tf_epc = elf->e_entry;
+	tf->tf_regs.reg_r[MIPS_REG_SP] = USTACKTOP;
+	uint32_t status = read_c0_status();
+	status &= ~ST0_KSU;
+	status |= KSU_USER;
+	status |= ST0_EXL;
+	tf->tf_status = status;
+	tf->tf_regs.reg_r[MIPS_REG_A0] = argc;
+	tf->tf_regs.reg_r[MIPS_REG_A1] = (uint32_t) uargv;
+
 	ret = 0;
 out:
 	return ret;
 bad_cleanup_mmap:
-	exit_mmap(mm);
 bad_elf_cleanup_pgdir:
-	put_pgdir(mm);
+	put_pgdir(current->pgdir);
 bad_pgdir_cleanup_mm:
-	mm_destroy(mm);
 bad_mm:
 	goto out;
 }
@@ -1084,7 +900,7 @@ static void put_kargv(int argc, char **kargv)
 }
 
 static int
-copy_kargv(struct mm_struct *mm, char **kargv, const char **argv, int max_argc,
+copy_kargv(char **kargv, const char **argv, int max_argc,
 	   int *argc_store)
 {
 	int i, ret = -E_INVAL;
@@ -1094,7 +910,7 @@ copy_kargv(struct mm_struct *mm, char **kargv, const char **argv, int max_argc,
 	}
 	char *argv_k;
 	for (i = 0; i < max_argc; i++) {
-		if (!copy_from_user(mm, &argv_k, argv + i, sizeof(char *), 0))
+		if (!memcpy(&argv_k, argv + i, sizeof(char *)))
 			goto failed_cleanup;
 		if (!argv_k)
 			break;
@@ -1102,14 +918,7 @@ copy_kargv(struct mm_struct *mm, char **kargv, const char **argv, int max_argc,
 		if ((buffer = kmalloc(EXEC_MAX_ARG_LEN + 1)) == NULL) {
 			goto failed_nomem;
 		}
-#if 0
-		if (!copy_from_user(mm, &argv_k, argv + i, sizeof(char *), 0) ||
-		    !copy_string(mm, buffer, argv_k, EXEC_MAX_ARG_LEN + 1)) {
-			kfree(buffer);
-			goto failed_cleanup;
-		}
-#endif
-		if (!copy_string(mm, buffer, argv_k, EXEC_MAX_ARG_LEN + 1)) {
+		if (!copy_string(buffer, argv_k, EXEC_MAX_ARG_LEN + 1)) {
 			kfree(buffer);
 			goto failed_cleanup;
 		}
@@ -1129,8 +938,6 @@ int do_execve(const char *filename, const char **argv, const char **envp)
 {
 	static_assert(EXEC_MAX_ARG_LEN >= FS_MAX_FPATH_LEN);
 
-	struct mm_struct *mm = current->mm;
-
 	char local_name[PROC_NAME_LEN + 1];
 	memset(local_name, 0, sizeof(local_name));
 
@@ -1138,71 +945,23 @@ int do_execve(const char *filename, const char **argv, const char **envp)
 	const char *path;
 
 	int ret = -E_INVAL;
-	lock_mm(mm);
-#if 0
-	if (name == NULL) {
-		snprintf(local_name, sizeof(local_name), "<null> %d",
-			 current->pid);
-	} else {
-		if (!copy_string(mm, local_name, name, sizeof(local_name))) {
-			unlock_mm(mm);
-			return ret;
-		}
-	}
-#endif
 	snprintf(local_name, sizeof(local_name), "<null> %d", current->pid);
 
 	int argc = 0, envc = 0;
-	if ((ret = copy_kargv(mm, kargv, argv, EXEC_MAX_ARG_NUM, &argc)) != 0) {
-		unlock_mm(mm);
+	if ((ret = copy_kargv(kargv, argv, EXEC_MAX_ARG_NUM, &argc)) != 0) {
 		return ret;
 	}
-	if ((ret = copy_kargv(mm, kenvp, envp, EXEC_MAX_ENV_NUM, &envc)) != 0) {
-		unlock_mm(mm);
+	if ((ret = copy_kargv(kenvp, envp, EXEC_MAX_ENV_NUM, &envc)) != 0) {
 		put_kargv(argc, kargv);
 		return ret;
 	}
-#if 0
-	int i;
-	kprintf("## fn %s\n\r", filename);
-	kprintf("## argc %d\n\r", argc);
-	for (i = 0; i < argc; i++)
-		kprintf("## %08x %s\n\r", kargv[i], kargv[i]);
-	kprintf("## envc %d\n\r", envc);
-	for (i = 0; i < envc; i++)
-		kprintf("## %08x %s\n\r", kenvp[i], kenvp[i]);
-#endif
-	//path = argv[0];
-	//copy_from_user (mm, &path, argv, sizeof (char*), 0);
 	path = filename;
-	unlock_mm(mm);
-
-	/* linux never do this */
-	//fs_closeall(current->fs_struct);
-
-	/* sysfile_open will check the first argument path, thus we have to use a user-space pointer, and argv[0] may be incorrect */
 
 	int fd;
 	if ((ret = fd = sysfile_open(path, O_RDONLY)) < 0) {
 		goto execve_exit;
 	}
 
-	if (mm != NULL) {
-		mm->lapic = -1;
-		mp_set_mm_pagetable(NULL);
-		if (mm_count_dec(mm) == 0) {
-			exit_mmap(mm);
-			put_pgdir(mm);
-			bool intr_flag;
-			local_intr_save(intr_flag);
-			{
-				list_del(&(mm->proc_mm_link));
-			}
-			local_intr_restore(intr_flag);
-			mm_destroy(mm);
-		}
-		current->mm = NULL;
-	}
 	put_sem_queue(current);
 
 	ret = -E_NO_MEM;
@@ -1230,9 +989,6 @@ int do_execve(const char *filename, const char **argv, const char **envp)
 
 	set_proc_name(current, local_name);
 
-	if (do_execve_arch_hook(argc, kargv) < 0)
-		goto execve_exit;
-
 	put_kargv(argc, kargv);
 	put_kargv(envc, kenvp);
 	return 0;
@@ -1258,13 +1014,6 @@ int do_yield(void)
 // NOTE: only after do_wait function, all resources of the child proces are free.
 int do_wait(int pid, int *code_store)
 {
-	struct mm_struct *mm = current->mm;
-	if (code_store != NULL) {
-		if (!user_mem_check(mm, (uintptr_t) code_store, sizeof(int), 1)) {
-			return -E_INVAL;
-		}
-	}
-
 	struct proc_struct *proc;//, *cproc;
 	bool intr_flag, haskid;
 repeat:
@@ -1313,27 +1062,17 @@ found:
 
 	int ret = 0;
 	if (code_store != NULL) {
-		lock_mm(mm);
 		{
-			if (!copy_to_user
-			    (mm, code_store, &exit_code, sizeof(int))) {
+			if (!memcpy(code_store, &exit_code, sizeof(int))) {
 				ret = -E_INVAL;
 			}
 		}
-		unlock_mm(mm);
 	}
 	return ret;
 }
 
 int do_linux_waitpid(int pid, int *code_store)
 {
-	struct mm_struct *mm = current->mm;
-	if (code_store != NULL) {
-		if (!user_mem_check(mm, (uintptr_t) code_store, sizeof(int), 1)) {
-			return -E_INVAL;
-		}
-	}
-
 	struct proc_struct *proc, *cproc;
 	bool intr_flag, haskid;
 repeat:
@@ -1396,14 +1135,12 @@ found:
 
 	int ret = 0;
 	if (code_store != NULL) {
-		lock_mm(mm);
 		{
 			int status = exit_code << 8;
-			if (!copy_to_user(mm, code_store, &status, sizeof(int))) {
+			if (!memcpy(code_store, &status, sizeof(int))) {
 				ret = -E_INVAL;
 			}
 		}
-		unlock_mm(mm);
 	}
 	return (ret == 0) ? return_pid : ret;
 }
@@ -1432,99 +1169,6 @@ int do_kill(int pid, int error_code)
 	return -E_INVAL;
 }
 
-// do_brk - adjust(increase/decrease) the size of process heap, align with page size
-// NOTE: will change the process vma
-int do_brk(uintptr_t * brk_store)
-{
-	struct mm_struct *mm = current->mm;
-	if (mm == NULL) {
-		panic("kernel thread call sys_brk!!.\n\r");
-	}
-	if (brk_store == NULL) {
-		//     return -E_INVAL;
-		return mm->brk_start;
-	}
-
-	uintptr_t brk;
-
-	lock_mm(mm);
-	if (!copy_from_user(mm, &brk, brk_store, sizeof(uintptr_t), 1)) {
-		unlock_mm(mm);
-		return -E_INVAL;
-	}
-
-	if (brk < mm->brk_start) {
-		goto out_unlock;
-	}
-	uintptr_t newbrk = ROUNDUP(brk, PGSIZE), oldbrk = mm->brk;
-	assert(oldbrk % PGSIZE == 0);
-	if (newbrk == oldbrk) {
-		goto out_unlock;
-	}
-	if (newbrk < oldbrk) {
-		if (mm_unmap(mm, newbrk, oldbrk - newbrk) != 0) {
-			goto out_unlock;
-		}
-	} else {
-		if (find_vma_intersection(mm, oldbrk, newbrk + PGSIZE) != NULL) {
-			goto out_unlock;
-		}
-		if (mm_brk(mm, oldbrk, newbrk - oldbrk) != 0) {
-			goto out_unlock;
-		}
-	}
-	mm->brk = newbrk;
-out_unlock:
-	copy_to_user(mm, brk_store, &mm->brk, sizeof(uintptr_t));
-	unlock_mm(mm);
-	return 0;
-}
-
-/* poring from linux */
-int do_linux_brk(uintptr_t brk)
-{
-	uint32_t newbrk, oldbrk, retval;
-	struct mm_struct *mm = current->mm;
-	uint32_t min_brk;
-
-	if (!mm) {
-		panic("kernel thread call sys_brk!!.\n\r");
-	}
-
-	lock_mm(mm);
-
-	min_brk = mm->brk_start;
-
-	if (brk < min_brk)
-		goto out_unlock;
-
-	newbrk = ROUNDUP(brk, PGSIZE);
-	oldbrk = ROUNDUP(mm->brk, PGSIZE);
-
-	if (oldbrk == newbrk)
-		goto set_brk;
-
-	if (brk <= mm->brk) {
-		if (!mm_unmap(mm, newbrk, oldbrk - newbrk))
-			goto set_brk;
-		goto out_unlock;
-	}
-
-	if (find_vma_intersection(mm, oldbrk, newbrk + PGSIZE))
-		goto out_unlock;
-
-	/* set the brk */
-	if (mm_brk(mm, oldbrk, newbrk - oldbrk))
-		goto out_unlock;
-
-set_brk:
-	mm->brk = brk;
-out_unlock:
-	retval = mm->brk;
-	unlock_mm(mm);
-	return retval;
-}
-
 // do_sleep - set current process state to sleep and add timer with "time"
 //          - then call scheduler. if process run again, delete timer first.
 //      time is jiffies
@@ -1551,14 +1195,10 @@ int do_sleep(unsigned int time)
 int do_linux_sleep(const struct linux_timespec __user * req,
 		   struct linux_timespec __user * rem)
 {
-	struct mm_struct *mm = current->mm;
 	struct linux_timespec kts;
-	lock_mm(mm);
-	if (!copy_from_user(mm, &kts, req, sizeof(struct linux_timespec), 1)) {
-		unlock_mm(mm);
+	if (!memcpy(&kts, req, sizeof(struct linux_timespec))) {
 		return -E_INVAL;
 	}
-	unlock_mm(mm);
 	long msec = kts.tv_sec * 1000 + kts.tv_nsec / 1000000;
 	if (msec < 0)
 		return -E_INVAL;
@@ -1571,170 +1211,10 @@ int do_linux_sleep(const struct linux_timespec __user * req,
 	int ret = do_sleep(j);
 	if (rem) {
 		memset(&kts, 0, sizeof(struct linux_timespec));
-		lock_mm(mm);
-		if (!copy_to_user(mm, rem, &kts, sizeof(struct linux_timespec))) {
-			unlock_mm(mm);
+		if (!memcpy(rem, &kts, sizeof(struct linux_timespec))) {
 			return -E_INVAL;
 		}
-		unlock_mm(mm);
 	}
-	return ret;
-}
-
-int
-__do_linux_mmap(uintptr_t __user * addr_store, size_t len, uint32_t mmap_flags)
-{
-	struct mm_struct *mm = current->mm;
-	if (mm == NULL) {
-		panic("kernel thread call mmap!!.\n\r");
-	}
-	if (addr_store == NULL || len == 0) {
-		return -E_INVAL;
-	}
-
-	int ret = -E_INVAL;
-
-	uintptr_t addr;
-	addr = *addr_store;
-
-	uintptr_t start = ROUNDDOWN(addr, PGSIZE), end =
-	    ROUNDUP(addr + len, PGSIZE);
-	addr = start, len = end - start;
-
-	uint32_t vm_flags = VM_READ;
-
-	/* set anonymous flag */
-	vm_flags |= VM_ANONYMOUS;
-
-	if (mmap_flags & MMAP_WRITE)
-		vm_flags |= VM_WRITE;
-	if (mmap_flags & MMAP_STACK)
-		vm_flags |= VM_STACK;
-
-	ret = -E_NO_MEM;
-	if (addr == 0) {
-		if ((addr = get_unmapped_area(mm, len)) == 0) {
-			goto out_unlock;
-		}
-	}
-	if ((ret = mm_map(mm, addr, len, vm_flags, NULL)) == 0) {
-		*addr_store = addr;
-	}
-out_unlock:
-	return ret;
-}
-
-// do_mmap - add a vma with addr, len and flags(VM_READ/M_WRITE/VM_STACK)
-int do_mmap(uintptr_t __user * addr_store, size_t len, uint32_t mmap_flags)
-{
-	struct mm_struct *mm = current->mm;
-	if (mm == NULL) {
-		panic("kernel thread call mmap!!.\n\r");
-	}
-	if (addr_store == NULL || len == 0) {
-		return -E_INVAL;
-	}
-
-	int ret = -E_INVAL;
-
-	uintptr_t addr;
-
-	lock_mm(mm);
-	if (!copy_from_user(mm, &addr, addr_store, sizeof(uintptr_t), 1)) {
-		goto out_unlock;
-	}
-
-	uintptr_t start = ROUNDDOWN(addr, PGSIZE), end =
-	    ROUNDUP(addr + len, PGSIZE);
-	addr = start, len = end - start;
-
-	uint32_t vm_flags = VM_READ;
-	if (mmap_flags & MMAP_WRITE)
-		vm_flags |= VM_WRITE;
-	if (mmap_flags & MMAP_STACK)
-		vm_flags |= VM_STACK;
-
-	ret = -E_NO_MEM;
-	if (addr == 0) {
-		if ((addr = get_unmapped_area(mm, len)) == 0) {
-			goto out_unlock;
-		}
-	}
-	if ((ret = mm_map(mm, addr, len, vm_flags, NULL)) == 0) {
-		copy_to_user(mm, addr_store, &addr, sizeof(uintptr_t));
-	}
-out_unlock:
-	unlock_mm(mm);
-	return ret;
-}
-
-// do_munmap - delete vma with addr & len
-int do_munmap(uintptr_t addr, size_t len)
-{
-	struct mm_struct *mm = current->mm;
-	if (mm == NULL) {
-		panic("kernel thread call munmap!!.\n\r");
-	}
-	if (len == 0) {
-		return -E_INVAL;
-	}
-	int ret;
-	lock_mm(mm);
-	{
-		ret = mm_unmap(mm, addr, len);
-	}
-	unlock_mm(mm);
-	return ret;
-}
-
-// do_shmem - create a share memory with addr, len, flags(VM_READ/M_WRITE/VM_STACK)
-int do_shmem(uintptr_t * addr_store, size_t len, uint32_t mmap_flags)
-{
-	struct mm_struct *mm = current->mm;
-	if (mm == NULL) {
-		panic("kernel thread call mmap!!.\n\r");
-	}
-	if (addr_store == NULL || len == 0) {
-		return -E_INVAL;
-	}
-
-	int ret = -E_INVAL;
-
-	uintptr_t addr;
-
-	lock_mm(mm);
-	if (!copy_from_user(mm, &addr, addr_store, sizeof(uintptr_t), 1)) {
-		goto out_unlock;
-	}
-
-	uintptr_t start = ROUNDDOWN(addr, PGSIZE), end =
-	    ROUNDUP(addr + len, PGSIZE);
-	addr = start, len = end - start;
-
-	uint32_t vm_flags = VM_READ;
-	if (mmap_flags & MMAP_WRITE)
-		vm_flags |= VM_WRITE;
-	if (mmap_flags & MMAP_STACK)
-		vm_flags |= VM_STACK;
-
-	ret = -E_NO_MEM;
-	if (addr == 0) {
-		if ((addr = get_unmapped_area(mm, len)) == 0) {
-			goto out_unlock;
-		}
-	}
-	struct shmem_struct *shmem;
-	if ((shmem = shmem_create(len)) == NULL) {
-		goto out_unlock;
-	}
-	if ((ret = mm_map_shmem(mm, addr, vm_flags, shmem, NULL)) != 0) {
-		assert(shmem_ref(shmem) == 0);
-		shmem_destroy(shmem);
-		goto out_unlock;
-	}
-	copy_to_user(mm, addr_store, &addr, sizeof(uintptr_t));
-out_unlock:
-	unlock_mm(mm);
 	return ret;
 }
 
@@ -1846,7 +1326,6 @@ void proc_init(void)
 	int lcpu_count = pls_read(lcpu_count);
 
 	list_init(&proc_list);
-	list_init(&proc_mm_list);
 	for (i = 0; i < HASH_LIST_SIZE; i++) {
 		list_init(hash_list + i);
 	}
@@ -1930,13 +1409,10 @@ int do_linux_ugetrlimit(int res, struct linux_rlimit *__user __limit)
 	default:
 		return -E_INVAL;
 	}
-	struct mm_struct *mm = current->mm;
-	lock_mm(mm);
 	int ret = 0;
-	if (!copy_to_user(mm, __limit, &limit, sizeof(struct linux_rlimit))) {
+	if (!memcpy(__limit, &limit, sizeof(struct linux_rlimit))) {
 		ret = -E_INVAL;
 	}
-	unlock_mm(mm);
 	return ret;
 }
 // cpu_idle - at the end of kern_init, the first kernel thread idleproc will do below works
@@ -1971,38 +1447,6 @@ copy_thread(uint32_t clone_flags, struct proc_struct *proc, uintptr_t esp,
 	proc->tf->tf_regs.reg_r[MIPS_REG_SP] = esp;
 	proc->context.sf_ra = (uintptr_t) forkret;
 	proc->context.sf_sp = (uintptr_t) (proc->tf) - 32;
-	return 0;
-}
-
-int do_execve_arch_hook(int argc, char **kargv)
-{
-	return 0;
-}
-
-int init_new_context(struct proc_struct *proc, struct elfhdr *elf,
-		 int argc, char **kargv, int envc, char **kenvp)
-{
-
-	uintptr_t stacktop = USTACKTOP - argc * PGSIZE;
-	char **uargv = (char **)(stacktop - argc * sizeof(char *));
-	int i;
-	for (i = 0; i < argc; i++) {
-		uargv[i] = strcpy((char *)(stacktop + i * PGSIZE), kargv[i]);
-	}
-	//stacktop = (uintptr_t)uargv - sizeof(int);
-	//*(int *)stacktop = argc;
-	struct trapframe *tf = proc->tf;
-	memset(tf, 0, sizeof(struct trapframe));
-	tf->tf_epc = elf->e_entry;
-	tf->tf_regs.reg_r[MIPS_REG_SP] = USTACKTOP;
-	uint32_t status = read_c0_status();
-	status &= ~ST0_KSU;
-	status |= KSU_USER;
-	status |= ST0_EXL;
-	tf->tf_status = status;
-	tf->tf_regs.reg_r[MIPS_REG_A0] = argc;
-	tf->tf_regs.reg_r[MIPS_REG_A1] = (uint32_t) uargv;
-
 	return 0;
 }
 

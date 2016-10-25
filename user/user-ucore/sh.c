@@ -1,7 +1,6 @@
 #include <ulib.h>
 #include <stdio.h>
 #include <string.h>
-#include <malloc.h>
 #include <dir.h>
 #include <file.h>
 #include <error.h>
@@ -16,7 +15,7 @@
 
 static const char *g_envp[] = { "PATH=/bin", NULL };
 
-static char *shcwd = NULL;
+char shcwd[BUFSIZE];
 
 int gettoken(char **p1, char **p2)
 {
@@ -227,7 +226,7 @@ int main(int argc, char **argv)
 		usage();
 		return -1;
 	}
-	shcwd = shmem_malloc(BUFSIZE);
+	// shcwd = (char *)malloc(BUFSIZE);
 	assert(shcwd != NULL);
 
 	char *buffer;

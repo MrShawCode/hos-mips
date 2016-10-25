@@ -1,5 +1,5 @@
-#ifndef __GLUE_UCORE_MP_H__
-#define __GLUE_UCORE_MP_H__
+#ifndef __UCORE_MP_H__
+#define __UCORE_MP_H__
 
 #include <mp.h>
 #include <memlayout.h>
@@ -30,11 +30,9 @@ extern volatile int mpti_end;
 
 int mp_init(void);
 
-struct mm_struct;
-
 void kern_enter(int source);
 void kern_leave(void);
-void mp_set_mm_pagetable(struct mm_struct *mm);
+void set_pagetable(pgd_t * pgdir);
 void __mp_tlb_invalidate(pgd_t * pgdir, uintptr_t la);
 void mp_tlb_invalidate(pgd_t * pgdir, uintptr_t la);
 void mp_tlb_update(pgd_t * pgdir, uintptr_t la);

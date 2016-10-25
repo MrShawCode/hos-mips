@@ -1,6 +1,5 @@
 #include <types.h>
 #include <mmu.h>
-#include <vmm.h>
 #include <ipc.h>
 #include <proc.h>
 #include <pmm.h>
@@ -228,7 +227,7 @@ static struct msg_msg *load_msg(const void *src, size_t len)
 		*segp = seg, segp = &(seg->next);
 		dst = seg + 1;
 inside:
-		copy_from_user(current->mm, dst, src, alen, 0);
+		memcpy(dst, src, alen);
 		len -= alen, src = ((char *)src) + alen;
 		*segp = NULL;
 	}
@@ -292,29 +291,19 @@ int ipc_mbox_send(int id, struct mboxbuf *buf, unsigned int timeout)
 
 	struct msg_msg *msg;
 	struct msg_mbox *mbox;
-	struct mm_struct *mm = current->mm;
 	struct mboxbuf __local_buf, *local_buf = &__local_buf;
 
 	int ret = -E_INVAL;
 
-	lock_mm(mm);
-	{
-		if (copy_from_user
-		    (mm, local_buf, buf, sizeof(struct mboxbuf), 0)) {
-			size_t len = local_buf->len;
-			if (0 < len && len <= MAX_MSG_BYTES) {
-				void *src = local_buf->data;
-				if (user_mem_check(mm, (uintptr_t) src, len, 0)) {
-					ret =
-					    ((msg =
-					      load_msg(src,
-						       len)) !=
-					     NULL) ? 0 : -E_NO_MEM;
-				}
-			}
+	if (memcpy(local_buf, buf, sizeof(struct mboxbuf))) {
+		size_t len = local_buf->len;
+		if (0 < len && len <= MAX_MSG_BYTES) {
+			void *src = local_buf->data;
+			ret =((msg = load_msg(src, len)) != NULL) ? 0 : -E_NO_MEM;
+			
 		}
 	}
-	unlock_mm(mm);
+	
 
 	if (ret == 0) {
 		ret = -E_INVAL;
@@ -354,7 +343,7 @@ static void store_msg(struct msg_msg *msg, void *dst)
 		assert(seg != NULL);
 		src = seg + 1, seg = seg->next;
 inside:
-		copy_to_user(current->mm, dst, src, alen);
+		memcpy(dst, src, alen);
 		len -= alen, dst = ((char *)dst) + alen;
 	}
 }
@@ -411,25 +400,16 @@ int ipc_mbox_recv(int id, struct mboxbuf *buf, unsigned int timeout)
 	size_t size;
 	struct msg_msg *msg;
 	struct msg_mbox *mbox;
-	struct mm_struct *mm = current->mm;
 	struct mboxbuf __local_buf, *local_buf = &__local_buf;
 
 	int ret = -E_INVAL;
 
-	lock_mm(mm);
-	{
-		if (copy_from_user
-		    (mm, local_buf, buf, sizeof(struct mboxbuf), 1)) {
-			if ((size = local_buf->size) > 0) {
-				void *dst = local_buf->data;
-				if (user_mem_check
-				    (mm, (uintptr_t) dst, size, 1)) {
-					ret = 0;
-				}
-			}
+	if (memcpy(local_buf, buf, sizeof(struct mboxbuf))) {
+		if ((size = local_buf->size) > 0) {
+			void *dst = local_buf->data;
+			ret = 0;
 		}
 	}
-	unlock_mm(mm);
 
 	if (ret != 0 || (mbox = get_mbox(id)) == NULL) {
 		return -E_INVAL;
@@ -447,18 +427,15 @@ int ipc_mbox_recv(int id, struct mboxbuf *buf, unsigned int timeout)
 
 	ret = -E_INVAL;
 
-	lock_mm(mm);
-	{
-		size_t len;
-		local_buf->len = len = msg->bytes, local_buf->from = msg->pid;
-		if (copy_to_user(mm, buf, local_buf, sizeof(struct mboxbuf))) {
-			void *dst = local_buf->data;
-			if (user_mem_check(mm, (uintptr_t) dst, len, 1)) {
-				ret = 0, store_msg(msg, dst);
-			}
-		}
+	size_t len;
+	local_buf->len = len = msg->bytes, local_buf->from = msg->pid;
+	if (memcpy(buf, local_buf, sizeof(struct mboxbuf))) {
+		void *dst = local_buf->data;
+		ret = 0;
+		store_msg(msg, dst);
 	}
-	unlock_mm(mm);
+
+	
 
 	if (ret != 0 && (mbox = get_mbox(id)) != NULL) {
 		bool local_intr;
@@ -507,7 +484,6 @@ int ipc_mbox_info(int id, struct mboxinfo *info)
 		return -E_INVAL;
 	}
 
-	struct mm_struct *mm = current->mm;
 	struct mboxinfo __local_info, *local_info = &__local_info;
 
 	local_info->slots = mbox->slots;
@@ -517,15 +493,8 @@ int ipc_mbox_info(int id, struct mboxinfo *info)
 	local_info->has_receiver = !wait_queue_empty(&(mbox->receivers));
 
 	int ret;
-
-	lock_mm(mm);
-	{
-		ret =
-		    (copy_to_user
-		     (mm, info, local_info,
+	ret =(memcpy(info, local_info,
 		      sizeof(struct mboxinfo))) ? 0 : -E_INVAL;
-	}
-	unlock_mm(mm);
 	return ret;
 }
 

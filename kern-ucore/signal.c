@@ -4,7 +4,6 @@
 #include <pmm.h>
 #include <signal.h>
 #include <string.h>
-#include <vmm.h>
 #include <sched.h>
 #include <mips_io.h>
 #include <mp.h>
@@ -203,20 +202,19 @@ int do_sigaction(int sign, const struct sigaction *act, struct sigaction *old)
 		panic("kernel thread call sigaction (i guess)\n");
 	}
 	int ret = 0;
-	struct mm_struct *mm = current->mm;
-	lock_mm(mm);
-	if (old != NULL && !copy_to_user(mm, old, k, sizeof(struct sigaction))) {
-		unlock_mm(mm);
+	
+	if (old != NULL && !memcpy(old, k, sizeof(struct sigaction))) {
+		
 		ret = -E_INVAL;
 		goto out;
 	}
 	if (act == NULL
-	    || !copy_from_user(mm, k, act, sizeof(struct sigaction), 1)) {
-		unlock_mm(mm);
+	    || !memcpy(k, act, sizeof(struct sigaction))) {
+		
 		ret = -E_INVAL;
 		goto out;
 	}
-	unlock_mm(mm);
+	
 	lock_sig(get_si(current)->sighand);
 	sigset_del(k->sa_mask, SIGKILL);
 	sigset_del(k->sa_mask, SIGSTOP);
@@ -247,11 +245,9 @@ int do_sigpending(sigset_t * set)
 	pending &= get_si(current)->blocked;
 	int ret = 0;
 	if (set != NULL) {
-		lock_mm(current->mm);
-		if (!copy_to_user(current->mm, set, &pending, sizeof(sigset_t))) {
+		if (!memcpy(set, &pending, sizeof(sigset_t))) {
 			ret = -E_INVAL;
 		}
-		unlock_mm(current->mm);
 	}
 	return ret;
 }
@@ -265,19 +261,14 @@ int do_sigprocmask(int how, const sigset_t * set, sigset_t * old)
 	if (set == NULL) {
 		goto out;
 	}
-	struct mm_struct *mm = current->mm;
-	lock_mm(mm);
-	if (!copy_from_user(mm, &new, set, sizeof(sigset_t), 1)) {
-		unlock_mm(mm);
-		goto out;
-	}
+	
+	memcpy(&new, set, sizeof(sigset_t));
 	if (old != NULL
-	    && !copy_to_user(mm, old, &(get_si(current)->blocked),
+	    && !memcpy(old, &(get_si(current)->blocked),
 			     sizeof(sigset_t))) {
-		unlock_mm(mm);
 		goto out;
 	}
-	unlock_mm(mm);
+	
 	sigset_del(new, SIGKILL);
 	sigset_del(new, SIGSTOP);
 	ret = 0;
@@ -302,16 +293,11 @@ out:
 // do syscall sigsuspend
 int do_sigsuspend(sigset_t __user * pmask)
 {
-	struct mm_struct *mm = pls_read(current)->mm;
 	sigset_t mask;
-	lock_mm(mm);
-	{
-		if (!copy_from_user(mm, &mask, pmask, sizeof(sigset_t), 0)) {
-			unlock_mm(mm);
-			return -E_INVAL;
-		}
+	if (!memcpy(&mask, pmask, sizeof(sigset_t))) {
+		return -E_INVAL;
 	}
-	unlock_mm(mm);
+	
 	//kprintf("## %llx\n", mask);
 
 	sigset_t set;
@@ -657,18 +643,17 @@ int do_sigaltstack(const stack_t * ss, stack_t * old)
 		return ret;
 	}
 
-	struct mm_struct *mm = current->mm;
 	stack_t stack =
 	    { get_si(current)->sas_ss_sp, 0, get_si(current)->sas_ss_size };
-	lock_mm(mm);
-	if (old != NULL && !copy_to_user(mm, old, &stack, sizeof(stack_t))) {
+	
+	if (old != NULL && !memcpy(old, &stack, sizeof(stack_t))) {
 		goto out;
 	}
-	if (copy_from_user(mm, &stack, ss, sizeof(stack_t), 1)) {
+	if (memcpy(&stack, ss, sizeof(stack_t))) {
 		get_si(current)->sas_ss_sp = stack.sp;
 		get_si(current)->sas_ss_size = stack.size;
 	}
-	unlock_mm(mm);
+	
 out:
 	return ret;
 }
@@ -676,17 +661,14 @@ out:
 int do_sigwaitinfo(const sigset_t * setp, struct siginfo_t *info)
 {
 	sigset_t set;
-	struct mm_struct *mm = current->mm;
-	assert(mm != NULL);
-	lock_mm(mm);
+	
 	if (setp == NULL
-	    || !copy_from_user(mm, &set, setp, sizeof(sigset_t), 0)) {
+	    || !memcpy(&set, setp, sizeof(sigset_t))) {
 		assert(0);
-		unlock_mm(mm);
+		
 		return -1;
 	}
-	unlock_mm(mm);
-
+	
 	sigset_add(set, SIGKILL);
 	sigset_add(set, SIGSTOP);
 	sigset_t old_blocked = get_si(current)->blocked;

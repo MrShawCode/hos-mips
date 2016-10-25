@@ -11,7 +11,7 @@
 #include <pgmap.h>
 #include <assert.h>
 #include <console.h>
-#include <kdebug.h>
+#include <monitor.h>
 #include <error.h>
 #include <syscall.h>
 #include <proc.h>
@@ -140,27 +140,7 @@ static inline int get_error_code(int write, pte_t * pte)
 static int
 pgfault_handler(struct trapframe *tf, uint32_t addr, uint32_t error_code)
 {
-#if 0
-	extern struct mm_struct *check_mm_struct;
-	if (check_mm_struct != NULL) {
-		return do_pgfault(check_mm_struct, error_code, addr);
-	}
-	panic("unhandled page fault.\n\r");
-#endif
-	extern struct mm_struct *check_mm_struct;
-	struct mm_struct *mm;
-	if (check_mm_struct != NULL) {
-		assert(current == idleproc);
-		mm = check_mm_struct;
-	} else {
-		if (current == NULL) {
-			print_trapframe(tf);
-			//print_pgfault(tf);
-			panic("unhandled page fault.\n\r");
-		}
-		mm = current->mm;
-	}			//kprintf("  (do_pgfault(%x,%d,%x))  ", mm, error_code, addr);
-	return do_pgfault(mm, error_code, addr);
+	return do_pgfault(error_code, addr);
 }
 
 /* use software emulated X86 pgfault */
@@ -331,4 +311,36 @@ int ucore_in_interrupt()
 {
 	//panic("ucore_in_interrupt()");
 	return 0;
+}
+
+int do_pgfault(machine_word_t error_code, uintptr_t addr)
+{
+	struct proc_struct *current = pls_read(current);
+
+	int ret = -E_INVAL;
+
+	assert(error_code == 3);
+
+	pte_perm_t perm, nperm;
+	ptep_unmap(&perm);
+	ptep_set_u_read(&perm);
+	addr = ROUNDDOWN(addr, PGSIZE);
+
+	ret = -E_NO_MEM;
+
+	pte_t *ptep;
+	if ((ptep = get_pte(current->pgdir, addr, 1)) == NULL) {
+		goto failed;
+	}
+	if (!(*ptep & PTE_COW)) {
+		if (pgdir_alloc_page(current->pgdir, addr, perm) == NULL) {
+			goto failed;
+		}
+	} else {		//a present page, handle copy-on-write (cow) 
+		panic("unfinished");
+	}
+	ret = 0;
+
+failed:
+	return ret;
 }
