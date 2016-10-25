@@ -21,7 +21,16 @@ src/user-ucore/_initial
 
 # vim file
 *~
+
+# vivado
+*.log
+*.jou
+.Xil/
+
 # other
 success.txt
 delete_part.txt
 *.backup
+
+# save vscode setting
+!.vscode/

@@ -1,0 +1,34 @@
+{
+    "version": "0.1.0",
+    "command": "cmd",
+    "args": ["/C"],
+    "isShellCommand": true,
+    "showOutput": "always",
+    "suppressTaskName": true,
+    "tasks": [
+        {
+            "taskName": "make",
+            "args": [
+                "mintty",
+                "bash",
+                "-lc",
+                "cd /cygdrive/c/hos/hos-mips/; make"
+            ],
+            "isBuildCommand": true
+        },
+        {
+            "taskName": "make clean",
+            "args": [
+                "mintty",
+                "bash",
+                "-lc",
+                "cd /cygdrive/c/hos/hos-mips/; make clean"
+            ]
+        },
+        {
+            "taskName": "setEnv",
+            "args": ["run.bat"],
+            "isTestCommand": true
+        }
+    ]
+}

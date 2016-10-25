@@ -58,15 +58,6 @@ $(USER_OBJ_ROOT)/%.o: %.c
 $(BIN):
 	-mkdir -p $(BIN)
 
-ifeq ($(UCONFIG_SFS_MINIMAL_CONTENT),y)
-initial_dir:
-	ln -snf _initial.small $(INITIAL_DIR)
-else
-initial_dir:
-	ln -snf _initial.big $(INITIAL_DIR)
-endif
-
 clean:
 	find . -name \*.o -exec rm -f {} \;
 	rm -rf $(BIN) $(TESTBIN)
-	rm -f $(INITIAL_DIR)

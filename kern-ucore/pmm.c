@@ -871,7 +871,7 @@ kfree(void *ptr) {
 			break;
 		}
 	}
-	if(n > 1024 * 1024 || n <= 0)
+	if(n >= 1024 * 1024 || n <= 0)
 		kprintf("%d %d %d\n\r",i, index, n);
     assert(n > 0 && n < 1024*1024);
     assert(ptr != NULL);

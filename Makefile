@@ -126,7 +126,7 @@ endif
 ifneq ($(UCORE_TEST),)
 	@cp -r $(OBJPATH_ROOT)/user/testbin $(TMPSFS)
 endif
-	@$(Q)$(MAKE) -f $(TOPDIR)/user/user-ucore/Makefile -C $(TOPDIR)/user/user-ucore initial_dir
+	@$(Q)$(MAKE) -f $(TOPDIR)/user/user-ucore/Makefile -C $(TOPDIR)/user/user-ucore
 	@if [ $(ARCH) = "mips" ]; \
 	then \
 		echo " mips"; \
