@@ -1,5 +1,5 @@
-#ifndef __GLUE_PGMAP_H__
-#define __GLUE_PGMAP_H__
+#ifndef __PGMAP_H__
+#define __PGMAP_H__
 
 #include <mmu.h>
 #include <memlayout.h>
