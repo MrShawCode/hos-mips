@@ -1,1 +1,0 @@
-PUTTY.EXE -serial COM4 -sercfg 115200

@@ -1,1 +1,0 @@
-mintty bash -lc "cd /cygdrive/c/hos/hos-mips/; make clean"
