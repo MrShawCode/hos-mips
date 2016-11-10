@@ -10,7 +10,6 @@
             "remote": true,
             "cwd": "${workspaceRoot}",
             "gdbpath": "mips-sde-elf-gdb",
-            // "preLaunchTask": "setEnv",
             "autorun": [
                 "set endian little",
                 "monitor reset halt",
