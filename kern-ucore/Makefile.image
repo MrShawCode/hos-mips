@@ -3,10 +3,8 @@ include $(KCONFIG_AUTOCONFIG)
 endif
 
 ARCH_DIR := $(KTREE)
-BLTREE = $(TOPDIR)/bootloader
 
 KERNEL_ELF := $(KTREE_OBJ_ROOT)/ucore-kernel-initrd
-BOOTSECT   := $(OBJPATH_ROOT)/bootloader/loader.bin
 LINK_FILE	:= $(KTREE)/ucore.ld
 
 ROOTFS_IMG	:= $(OBJPATH_ROOT)/sfs-orig.img
@@ -43,7 +41,7 @@ $(BOOTSECT): $(OBJPATH_ROOT)
 	$(Q)$(MAKE) -C $(BLTREE) -f $(BLTREE)/Makefile all
 
 .PHONY: all clean FORCE
-all: $(BOOTSECT) $(KERNEL_ELF)
+all: $(KERNEL_ELF)
 
 FORCE:
 
