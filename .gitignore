@@ -1,0 +1,35 @@
+# normal rules
+.*
+
+# do NOT ignore this file
+!.gitignore
+
+# build directories
+obj
+build-*
+
+# cscope files
+cscope.*
+ncscope.*
+
+# userspace binaries & initial directory
+src/user-ucore/bin
+src/user-ucore/_initial
+
+# generated manuals
+*.man
+
+# vim file
+*~
+
+# vivado
+*.log
+*.jou
+.Xil/
+
+# other
+*.backup
+*.txt
+
+# save vscode setting
+!.vscode/

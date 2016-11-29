@@ -1,0 +1,25 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug",
+            "type": "gdb",
+            "request": "attach",
+            "executable": "${workspaceRoot}/obj/kernel/ucore-kernel-initrd",
+            "target": ":3333",
+            "remote": true,
+            "cwd": "${workspaceRoot}",
+            "gdbpath": "mips-sde-elf-gdb",
+            "autorun": [
+                "set endian little",
+                "monitor reset halt",
+                "b *0x9fc01200",
+                "continue",
+                "delete 1",
+                "load",
+                "b kern_init",
+                "continue"
+            ]
+        }
+    ]
+}

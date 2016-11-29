@@ -1,0 +1,18 @@
+{
+    "version": "0.1.0",
+    "command": "cmd",
+    "args": ["/C"],
+    "isShellCommand": true,
+    "showOutput": "always",
+    "suppressTaskName": true,
+    "tasks": [
+        {
+            "taskName": "make",
+            "args": [
+                "make",
+                "all"
+            ],
+            "isBuildCommand": true
+        }
+    ]
+}

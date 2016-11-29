@@ -1,0 +1,49 @@
+ifneq ($(MAKECMDGOALS),clean)
+include $(KCONFIG_AUTOCONFIG)
+endif
+
+ARCH_DIR := $(KTREE)
+
+KERNEL_ELF := $(KTREE_OBJ_ROOT)/ucore-kernel-initrd
+LINK_FILE	:= $(KTREE)/ucore.ld
+
+ROOTFS_IMG	:= $(OBJPATH_ROOT)/sfs-orig.img
+
+SRC_DIR   := $(ARCH_DIR)/include
+ASMSRC    	:= $(wildcard $(KTREE)/*.S)
+MIPS_S_OBJ     	:= $(patsubst $(ARCH_DIR)/%.S, $(KTREE_OBJ_ROOT)/%.o, $(ASMSRC))
+INCLUDES	:= $(addprefix -I,$(SRC_DIR))
+
+MK_DIR:
+	mkdir -p $(KTREE_OBJ_ROOT)
+	mkdir -p $(KTREE_OBJ_ROOT)/init
+	mkdir -p $(KTREE_OBJ_ROOT)/trap
+	mkdir -p $(KTREE_OBJ_ROOT)/process
+	mkdir -p $(KTREE_OBJ_ROOT)/module
+
+ifeq  ($(ON_FPGA), y)
+MACH_DEF := -DMACH_FPGA
+else
+MACH_DEF := -DMACH_QEMU
+endif
+
+$(MIPS_S_OBJ): $(KTREE_OBJ_ROOT)/%.o: $(ARCH_DIR)/%.S
+	$(TARGET_CC) -g -ggdb -c -D__ASSEMBLY__ $(MACH_DEF) -EL -mno-mips16 -msoft-float -march=m14k -G0 -Wformat -O2 -msoft-float $(INCLUDES) $<  -o $@
+
+$(KERNEL_ELF): $(LINK_FILE) $(KERNEL_BUILTIN) $(RAMDISK_OBJ) $(MIPS_S_OBJ)
+	@echo Linking uCore
+	sed 's%_FILE_%$(ROOTFS_IMG)%g' tools/initrd_piggy.S.in > $(KTREE_OBJ_ROOT)/initrd_piggy.S
+	$(CROSS_COMPILE)as -g --gen-debug -EL -mno-micromips -msoft-float -march=m14k $(KTREE_OBJ_ROOT)/initrd_piggy.S -o $(KTREE_OBJ_ROOT)/initrd.img.o
+	$(Q)$(TARGET_LD) $(TARGET_LDFLAGS) -T $(LINK_FILE) $(KERNEL_BUILTIN) $(RAMDISK_OBJ) $(MIPS_S_OBJ) $(KTREE_OBJ_ROOT)/initrd.img.o -o $@
+	$(CROSS_COMPILE)objdump -d -S -l $@ 1>$(KTREE_OBJ_ROOT)/u_dasm.txt
+
+$(BOOTSECT): $(OBJPATH_ROOT)
+	$(Q)$(MAKE) -C $(BLTREE) -f $(BLTREE)/Makefile all
+
+.PHONY: all clean FORCE
+all: $(KERNEL_ELF)
+
+FORCE:
+
+clean:
+	rm -f $(KERNEL_ELF)
