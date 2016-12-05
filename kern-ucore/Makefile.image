@@ -28,7 +28,7 @@ MACH_DEF := -DMACH_QEMU
 endif
 
 $(MIPS_S_OBJ): $(KTREE_OBJ_ROOT)/%.o: $(ARCH_DIR)/%.S
-	$(TARGET_CC) -g -ggdb -c -D__ASSEMBLY__ $(MACH_DEF) -EL -mno-mips16 -msoft-float -march=m14k -G0 -Wformat -O2 -msoft-float $(INCLUDES) $<  -o $@
+	$(TARGET_CC) -g -ggdb -c -D__ASSEMBLY__ $(MACH_DEF) -EL -mno-mips16 -msoft-float -march=m14k -G0 -Wformat -O0 -msoft-float $(INCLUDES) $<  -o $@
 
 $(KERNEL_ELF): $(LINK_FILE) $(KERNEL_BUILTIN) $(RAMDISK_OBJ) $(MIPS_S_OBJ)
 	@echo Linking uCore
