@@ -18,17 +18,19 @@ OBJPATH_ROOT := $(TOPDIR)/obj
 export TOPDIR KTREE OBJPATH_ROOT Q
 
 KCONFIG_AUTOCONFIG=$(TOPDIR)/Makefile.config
+include $(KCONFIG_AUTOCONFIG)
 #User Path
 USER_OBJ_ROOT := $(OBJPATH_ROOT)/user-ucore
 BIN := $(USER_OBJ_ROOT)/bin
-USER_APPLIST:= pwd cat sh ls cp echo mount umount # link mkdir rename unlink lsmod insmod rmmod 
 USER_APP_BINS:= $(addprefix $(BIN)/, $(USER_APPLIST))
 
-export USER_APPLIST
+UCONFIG_ARCH="mips"
+UCONFIG_HAVE_SFS=y
+ON_FPGA=y
+
+export UCONFIG_ARCH UCONFIG_HAVE_SFS ON_FPGA
 
 MAKEFLAGS += -rR --no-print-directory
-
-include $(KCONFIG_AUTOCONFIG)
 
 #### CROSS COMPILE HERE ####
 ARCH ?= $(patsubst "%",%,$(UCONFIG_ARCH))
@@ -134,7 +136,7 @@ endif
 		echo " mips"; \
 		cp -r $(TOPDIR)/user/user-ucore/_initial/hello.txt $(TMPSFS); \
 		rm -f $@; \
-		dd if=/dev/zero of=$@ count=2400; \
+		dd if=/dev/zero of=$@ count=4800; \
 	else \
 		echo -n $(ARCH)." not mips"; \
 		cp -r $(TOPDIR)/user/user-ucore/_initial/* $(TMPSFS); \

@@ -635,12 +635,13 @@ int main(int argc, char **argv)
 {
 	static_check();
 	if (argc != 3) {
-		bug("usage: <input *.img> <input dirname>\n");
 	}
 	const char *imgname = argv[1], *home = argv[2];
-	if (create_img(open_img(imgname), home) != 0) {
+	struct sfs_fs *sfs = open_img( imgname );
+	if (create_img(sfs, home) != 0) {
 		bug("create img failed.\n");
 	}
 	printf("create %s (%s) successfully.\n", imgname, home);
+	printf( "inode:%d, next_ino:%d\n", sfs->ninos, sfs->next_ino );
 	return 0;
 }
