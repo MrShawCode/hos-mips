@@ -12,20 +12,3 @@ int tkill(int pid, int sign)
 {
 	return sys_linux_tkill(pid, sign);
 }
-
-int sigprocmask(int how, const sigset_t * set, sigset_t * old)
-{
-	return sys_linux_sigprocmask(how, set, old);
-}
-
-int sigsuspend(uint32_t mask)
-{
-	return sys_linux_sigsuspend(0, 0, mask);
-}
-
-#if 0
-int set_shellrun_pid()
-{
-	return sys_set_shellrun_pid();
-}
-#endif

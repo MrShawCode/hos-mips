@@ -57,22 +57,10 @@ int sys_getdirentry(int fd, struct dirent *dirent);
 int sys_dup(int fd1, int fd2);
 int sys_pipe(int *fd_store);
 int sys_mkfifo(const char *name, uint32_t open_flags);
-
-int sys_init_module(void __user * umod, unsigned long len,
-		    const char __user * uargs);
-int sys_cleanup_module(const char __user * name);
-int sys_list_module();
-
 int sys_mount(const char *source, const char *target,
 	      const char *filesystemtype, const void *data);
 int sys_umount(const char *target);
 
 int sys_ioctl(int d, int request, unsigned long data);
-
-int sys_rf212_send(uint8_t len, uint8_t * data);
-int sys_rf212_reg(uint8_t reg, uint8_t value);
-int sys_rf212_reset();
-
-void sys_redraw_console();
 
 #endif /* !__USER_LIBS_SYSCALL_H__ */

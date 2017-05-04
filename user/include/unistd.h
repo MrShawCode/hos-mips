@@ -49,25 +49,8 @@
 #define SYS_pipe            140
 #define SYS_mkfifo          141
 
-/* chenyh 2012/7 */
-#define SYS_ioctl           142
-#define SYS_linux_tkill     144
-#define SYS_linux_sigaction 145
-#define SYS_linux_kill      146
-#define SYS_linux_sigprocmask   147
-#define SYS_linux_sigsuspend   148
-
-/* changlan */
-#define SYS_init_module     150
-#define SYS_cleanup_module  151
-#define SYS_list_module     152
 #define SYS_mount           153
 #define SYS_umount			154
-
-/* liucong 20121109 */
-#define SYS_rf212           199
-
-#define SYS_redraw_console		242
 
 /* SYS_fork flags */
 #define CLONE_VM             0x00000100
