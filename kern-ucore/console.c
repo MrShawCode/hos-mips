@@ -164,10 +164,17 @@ static int serial_proc_data(void)
 }
 
 void serial_int_handler(void *opaque)
-{
-    //int c = serial_proc_data();
-    int c = cons_getc();//c);
+{//corrected by xiaohan: this is actually not serial interrupt handler!
+ //This is in fact External Interrupt Controller's interrupt handler!
+ //So, remember to read the EIC to know what interrupt is happening. But for simplicity,
+ //here I assume that the EIC only represents serial's interrupt. Other interrupt sources are neglected.
+ //Next, rememer to write EIC to tell EIC that it's interrupt has been handled!
+ //otherwise the OS will fall into the dead loop of dealing with "previous" EIC interrupt.   
+    int c = cons_getc();
     extern void dev_stdin_write(char c);
+    //here we should tell EIC that the serial interrupt has been handled.
+    xilinx_intc_init();
+    //the following codes are related to "device drivers".
     dev_stdin_write(c);
 }
 

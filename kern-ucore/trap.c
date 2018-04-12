@@ -98,14 +98,16 @@ static void interrupt_handler(struct trapframe *tf)
 		if (tf->tf_cause & (1 << (CAUSEB_IP + i))) {
 			switch (i) {
 #ifdef DEBUG_INT
-			kprintf("INT - No %d\r\n", i);
+			//kprintf("INT - No %d\r\n", i);
 #endif
-			case TIMER0_IRQ:
+			//case TIMER0_IRQ:
+			case 7://corrected by xiaohan! Accoring to priority code.
 				clock_int_handler(NULL);
 				break;
-			case COM1_IRQ:
+			//case COM1_IRQ:
+			case 6://corrected by xiaohan! Accoring to priority code.
 				//kprintf("COM1\n");
-				kprintf("COM1\n\r");
+				//kprintf("COM1\n\r");
 				serial_int_handler(NULL);
 				break;
 //                        case KEYBOARD_IRQ:

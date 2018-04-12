@@ -136,7 +136,7 @@ endif
 		echo " mips"; \
 		cp -r $(TOPDIR)/user/user-ucore/_initial/hello.txt $(TMPSFS); \
 		rm -f $@; \
-		dd if=/dev/zero of=$@ count=4800; \
+		dd if=/dev/zero of=$@ count=3600; \
 	else \
 		echo -n $(ARCH)." not mips"; \
 		cp -r $(TOPDIR)/user/user-ucore/_initial/* $(TMPSFS); \

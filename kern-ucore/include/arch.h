@@ -89,5 +89,5 @@ static inline void outw(uint32_t port, uint32_t data)
 //#define KEYBOARD       0xaf000000
 
 #define WRITE_IO(addr) (volatile unsigned int *)( addr)
-
+#define READ_IO(addr)  (volatile unsigned int *)(addr)
 #endif /* !__LIBS_THUMIPS_H__ */

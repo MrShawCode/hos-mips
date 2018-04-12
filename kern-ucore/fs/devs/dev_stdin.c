@@ -11,7 +11,6 @@
 #include <unistd.h>
 #include <error.h>
 #include <assert.h>
-#include <kio.h>
 
 #define STDIN_BUFSIZE               4096
 
@@ -47,26 +46,14 @@ static int dev_stdin_read(char *buf, size_t len)
 			if (ret >= len)
 				break;
 try_again:
-/*			if (p_rpos < p_wpos) {
+			if (p_rpos < p_wpos) {
 				char c = stdin_buffer[p_rpos % STDIN_BUFSIZE];
 				//FIXME
-				kcons_putc(c);
+				//cons_putc(c); commented by xiaohan.
 				*buf++ = c;
 				p_rpos++;
 				ret++;
 				if (p_rpos >= p_wpos)
-					break;
-*/
-			//kprintf("p_rpos:%d,p_wpos:%d",p_rpos,p_wpos);
-			if (p_rpos >= p_wpos) {
-				//kprintf("asd1234\n\r");
-				char c = stdin_buffer[p_rpos % STDIN_BUFSIZE];
-				//FIXME
-				c=getchar();
-				*buf++ = c;
-				p_rpos++;
-				ret++;
-				if (p_rpos <= p_wpos)
 					break;
 			} else {
 				wait_t __wait, *wait = &__wait;
