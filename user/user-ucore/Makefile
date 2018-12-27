@@ -30,7 +30,7 @@ else
 MACH_DEF := -DMACH_QEMU
 endif
 
-ARCH_CFLAGS := -mips1 -fno-builtin -nostdlib  -nostdinc -g  -EL -G0 -Wformat -O0 -mno-float $(MACH_DEF)
+ARCH_CFLAGS := -mips1 -fno-builtin -nostdlib  -nostdinc -g  -EL -G0 -Wformat -O0 $(MACH_DEF)
 ARCH_LDFLAGS := 
 TARGET_CFLAGS += $(ARCH_CFLAGS)
 TARGET_LDFLAGS += $(ARCH_LDFLAGS)
