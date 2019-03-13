@@ -247,3 +247,11 @@ int sys_umount(const char *target)
 {
 	return syscall(SYS_umount, target);
 }
+
+int sys_mknod(const char *path, unsigned major, unsigned minor) {
+  return syscall(SYS_mknod, path, major, minor);
+}
+
+int sys_getdevinfo(struct devinfo *cur_dev, struct devinfo *next_dev) {
+  return syscall(SYS_getdevinfo, cur_dev, next_dev);
+}

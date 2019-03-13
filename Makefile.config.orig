@@ -1,0 +1,3 @@
+UCONFIG_CROSS_COMPILE="mips-mti-elf-"
+USER_APPLIST:= pwd cat sh ls cp echo mount umount  # link mkdir rename unlink lsmod insmod 
+export USER_APPLIST

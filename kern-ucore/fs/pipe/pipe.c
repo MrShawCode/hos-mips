@@ -65,7 +65,11 @@ void pipe_init(void)
 	pipe_fs_init(fs);
 
 	int ret;
-	if ((ret = vfs_add_fs("pipe", fs)) != 0) {
+  struct dev_index index = vfs_register_dev(4, "pipe");
+  if (dev_index_is_invalid(index)) {
+    panic("pipe: vfs_register_dev error.\n");
+  }
+	if ((ret = vfs_add_fs(index, "pipe", fs)) != 0) {
 		panic("pipe: vfs_add_fs: %e.\n", ret);
 	}
 }

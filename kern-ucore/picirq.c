@@ -3,6 +3,7 @@
 #include <arch.h>
 #include <picirq.h>
 #include <asm/mipsregs.h>
+#include <lib/string.h>
 
 
 

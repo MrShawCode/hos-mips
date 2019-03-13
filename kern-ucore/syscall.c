@@ -10,6 +10,7 @@
 #include <sysfile.h>
 #include <console.h>
 #include <error.h>
+#include <dev.h>
 
 #define current (pls_read(current))
 
@@ -264,6 +265,21 @@ sys_mkfifo(uint32_t arg[]) {
     return sysfile_mkfifo(name, open_flags);
 }
 
+static uint32_t
+sys_mknod(uint32_t arg[]) {
+  const char *path = (const char *)arg[0];
+  unsigned major = (unsigned)arg[1];
+  unsigned minor = (unsigned)arg[2];
+  return sysfile_mknod(path, major, minor);
+}
+
+static uint32_t
+sys_getdevinfo(uint32_t arg[]) {
+  struct devinfo *cur_dev = (struct devinfo *)arg[0];
+  struct devinfo *next_dev = (struct devinfo *)arg[1];
+  return dev_getdevinfo(cur_dev, next_dev);
+}
+
 static uint32_t (*syscalls[])(uint32_t arg[]) = {
     [SYS_exit]              sys_exit,
     [SYS_fork]              sys_fork,
@@ -302,6 +318,8 @@ static uint32_t (*syscalls[])(uint32_t arg[]) = {
     [SYS_dup]               sys_dup,
     [SYS_pipe]              sys_pipe,
     [SYS_mkfifo]            sys_mkfifo,
+    [SYS_mknod]             sys_mknod,
+    [SYS_getdevinfo]        sys_getdevinfo,
 };
 
 #define NUM_SYSCALLS        ((sizeof(syscalls)) / (sizeof(syscalls[0])))

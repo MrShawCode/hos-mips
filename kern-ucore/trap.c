@@ -118,7 +118,13 @@ static void interrupt_handler(struct trapframe *tf)
 //                                keyboard_int_handler();
 //                                pic_enable(KEYBOARD_IRQ);
 //                                break;
+#ifdef BUILD_GXEMUL
+			case 2:
+			gxemul_input_intr();
+			break;
+#endif
 			default:
+				kprintf("[KERN] Received Unknown Interrupt:");
 				print_trapframe(tf);
 				panic("Unknown interrupt!");
 			}

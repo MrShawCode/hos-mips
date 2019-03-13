@@ -155,6 +155,7 @@ static const struct inode_ops dev_node_ops = {
 	.vop_unlink = NULL_VOP_NOTDIR,
 	.vop_lookup = dev_lookup,
 	.vop_lookup_parent = NULL_VOP_NOTDIR,
+  	.vop_mknod = NULL_VOP_INVAL,
 };
 
 #define init_device(x)                                  \
@@ -162,15 +163,37 @@ static const struct inode_ops dev_node_ops = {
         extern void dev_init_##x(void);                 \
         dev_init_##x();                                 \
     } while (0)
+#define init_device_sfs_inode(x)                        \
+    do {                                                \
+        extern void dev_init_sfs_inode_##x(void);       \
+        dev_init_sfs_inode_##x();                       \
+    } while (0)
+
+static const char *default_dev_dir = "disk0:/dev";
 
 void dev_init(void)
 {
 	init_device(null);
 	init_device(stdin);
+	init_device(mychar);
 	init_device(stdout);
 	init_device(disk0);
 	/* for Nand flash */
 	init_device(disk1);
+	init_device(bluetooth);
+	init_device(car);
+}
+
+void dev_sfs_inode_init(void)
+{
+	init_device_sfs_inode(null);
+	init_device_sfs_inode(stdin);
+	init_device_sfs_inode(stdout);
+	init_device_sfs_inode(disk0);
+	init_device_sfs_inode(disk1);
+	init_device_sfs_inode(mychar);
+	init_device_sfs_inode(bluetooth);
+	init_device_sfs_inode(car);
 }
 
 /*
@@ -183,4 +206,17 @@ struct inode *dev_create_inode(void)
 		vop_init(node, &dev_node_ops, NULL);
 	}
 	return node;
+}
+
+int dev_make_sfs_inode(char *devname, struct dev_index index)
+{
+  int ret;
+  struct inode *dir, *node;
+  char *name;
+  char *dev_dir = strdup(default_dev_dir);
+  if ((ret = vfs_lookup(dev_dir, &dir)) != 0) {
+    return ret;
+  }
+  kfree(dev_dir);
+  return vop_mknod(dir, devname, index, &node);
 }

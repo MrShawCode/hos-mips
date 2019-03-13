@@ -78,16 +78,49 @@ static inline void outw(uint32_t port, uint32_t data)
 	*((volatile uintptr_t *)port) = data;
 }
 
+#define BT_UART_BASE 	0xB0500000
+#define CAR_DIR 	 	0xB0700000
+#define PWM_B_R_BASE 	0xB0C00000
+#define PWM_F_L_BASE 	0xB0D00000
+#define PWM_F_R_BASE 	0xB0E00000
+#define PWM_B_L_BASE 	0xB0F00000
 /* board specification */
 //#define ISA_BASE        0xbfd00000
 #define COM1            0xb0400000
 #define COM1_IRQ        4
+//#define COM2            0xb0500000
+
+#define COM_RBR         0x1000  // In:receive buffer
+#define COM_THR         0x1000  // Out:Transmitter Holding Register
+#define COM_IER         0x1004  // Out: Interrupt Enable Register
+#define COM_IIR         0x1008  // In:  Interrupt ID Register
+#define COM_FCR         0x1008  // Out: FIFO Control Register
+#define COM_LCR         0x100c  // Out: Line Control Register
+#define COM_MCR         0x1010  // Out: Modem Control Register
+#define COM_LSR         0x1014  // In:  Line Status Register
+#define COM_MSB         0x1018  // Modem Status Register
+#define COM_DLL         0x1000  // Out: Divisor Latch (Least Significant Byte) Register (DLAB=1)
+#define COM_DLM         0x1004  // Out: Divisor Latch (Most Significant Byte) Register (DLAB=1)
+
+#define rbr		0*4
+#define ier		1*4
+#define fcr		2*4
+#define lcr		3*4
+#define mcr		4*4
+#define lsr		5*4
+#define msr		6*4
+#define scr		7*4
+
+#define thr		rbr
+#define iir		fcr
+#define dll		rbr
+#define dlm		ier
 
 #define TIMER0_IRQ       0
 
 //#define KEYBOARD_IRQ    6
 //#define KEYBOARD       0xaf000000
 
-#define WRITE_IO(addr) (volatile unsigned int *)( addr)
+#define WRITE_IO(addr) (volatile unsigned int *)(addr)
 #define READ_IO(addr)  (volatile unsigned int *)(addr)
 #endif /* !__LIBS_THUMIPS_H__ */

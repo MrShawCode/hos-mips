@@ -125,11 +125,16 @@ static void serial_init(void)
         //pic_enable(KEYBOARD_IRQ);
 }
 
+#define GXEMUL_COM1 ((uintptr_t)0x90000000)
+
 static void serial_putc_sub(int c)
 {
 	if ((inw(COM1 + COM_IER) & COM_IER_RDI) == 0) delay();
     //delay();
     outw(COM1 + COM_THR, c & 0xFF);
+#ifdef BUILD_GXEMUL
+	outw(GXEMUL_COM1, c & 0xFF);
+#endif
     delay();
 }
 
@@ -148,6 +153,10 @@ static void serial_putc(int c)
 /* serial_proc_data - get data from serial port */
 static int serial_proc_data(void)
 {
+#ifdef BUILD_GXEMUL
+	int c = (*(unsigned char*)(GXEMUL_COM1)) & 0xFF;
+	if(c == 0) return -1;
+#else
     int c;
 
     delay();
@@ -156,11 +165,22 @@ static int serial_proc_data(void)
     delay();
     c = inw(COM1 + COM_RBR) & 0xFF;
     delay();
+#endif
 
     if (c == 127) {
         c = '\b';
     }
     return c;
+}
+
+// imzhwk: this is for gxemul emulator.
+// no need for comment, because the effective
+// handler dispatching already have this!
+void gxemul_input_intr(void){
+	int c = cons_getc();
+	// why previous HOS guys not make a header for this???
+	extern void dev_stdin_write(char c);
+	dev_stdin_write(c);
 }
 
 void serial_int_handler(void *opaque)

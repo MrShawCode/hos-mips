@@ -173,6 +173,8 @@ common_exception:
    sw $0, 12(sp)
 
   # support nested interrupt
+  # what are you fucking doing???
+  # isn't it clearing the IE to prevent any further interruptions?
   la   t0, ~(ST0_KSU|ST0_EXL|ST0_IE)
   and t1, t1, t0
   mtc0 t1, CP0_STATUS /* Copr.0 reg 11 == status */
@@ -320,6 +322,8 @@ __exception_vector:
 	RVECENT(ramReserved,29)
 	RVECENT(ramReserved,30)
 	RVECENT(ramReserved,31)
+  # imzhwk: or this is 0x100
+  # the only exception jumps here is CacheError
 	XVECENT(ramExcHandle_general, 32) 
 	RVECENT(ramReserved,33)
 	RVECENT(ramReserved,34)
@@ -336,6 +340,8 @@ __exception_vector:
 	RVECENT(ramReserved,45)
 	RVECENT(ramReserved,46)
 	RVECENT(ramReserved,47)
+  # this is the general exceptions, which
+  # will be all redirected to here, 0x180
   XVECENT(ramExcHandle_general, 0x180) 
 	RVECENT(ramReserved,49)
 	RVECENT(ramReserved,50)

@@ -39,6 +39,8 @@ void tlb_invalidate_all()
 
     //kprintf("\n\rbegin tlb_invalidate_all()\n\r");
     //dump_tlb_all();
+    // OKAY, so your implementation is assuming this CPU
+    // only have 16 TLB entries, OKAY...
     for (i = 0; i < 16; i++)//
     {
         te=0x80000000 + (i << 20);

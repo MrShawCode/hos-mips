@@ -10,6 +10,7 @@ struct inode;			// abstract structure for an on-disk file (inode.h)
 struct device;			// abstract structure for a device (dev.h)
 struct iobuf;			// kernel or userspace I/O buffer (iobuf.h)
 
+
 /*
  * Abstract filesystem. (Or device accessible as a file.)
  *
@@ -79,6 +80,8 @@ struct fs *__alloc_fs(int type);
 #define fsop_unmount(fs)                    ((fs)->fs_unmount(fs))
 #define fsop_cleanup(fs)                    ((fs)->fs_cleanup(fs))
 
+#define INVAL_VFS_INDEX { 0xffffffff, 0xffffffff }
+#define dev_index_is_invalid(index) ((index).major == 0xffffffff && (index).minor == 0xffffffff)
 /*
  * Virtual File System layer functions.
  *
@@ -104,7 +107,10 @@ int vfs_set_curdir(struct inode *dir);
 int vfs_get_curdir(struct inode **dir_store);
 int vfs_sync(void);
 int vfs_get_root(const char *devname, struct inode **root_store);
+int vfs_get_devnode(struct dev_index index, struct inode **node_store);
 const char *vfs_get_devname(struct fs *fs);
+struct dev_index vfs_get_dev_index(const char *devname);
+bool check_dev_exist(struct dev_index index);
 
 /*
  * VFS layer high-level operations on pathnames
@@ -133,6 +139,7 @@ int vfs_unlink(char *path);
 int vfs_rename(char *old_path, char *new_path);
 int vfs_chdir(char *path);
 int vfs_getcwd(struct iobuf *iob);
+int vfs_mknod(char *path, struct dev_index index);
 
 /*
  * VFS layer mid-level operations.
@@ -189,8 +196,9 @@ int vfs_lookup_parent(char *path, struct inode **node_store, char **endp);
 int vfs_set_bootfs(char *fsname);
 int vfs_get_bootfs(struct inode **node_store);
 
-int vfs_add_fs(const char *devname, struct fs *fs);
-int vfs_add_dev(const char *devname, struct inode *devnode, bool mountable);
+int vfs_add_fs(struct dev_index index, const char *devname, struct fs *fs);
+int vfs_add_dev(struct dev_index index, const char *devname, struct inode *devnode, bool mountable);
+struct dev_index vfs_register_dev(unsigned int major, const char *devname);
 
 int vfs_mount(const char *devname,
 	      int (*mountfunc) (struct device * dev, struct fs ** fs_store));

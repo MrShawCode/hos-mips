@@ -29,6 +29,7 @@
 #define SFS_TYPE_FILE                               1
 #define SFS_TYPE_DIR                                2
 #define SFS_TYPE_LINK                               3
+#define SFS_TYPE_DEVICE                             4
 
 /*
  * On-disk superblock
@@ -38,6 +39,11 @@ struct sfs_super {
 	uint32_t blocks;	/* # of blocks in fs */
 	uint32_t unused_blocks;	/* # of unused blocks in fs */
 	char info[SFS_MAX_INFO_LEN + 1];	/* infomation for sfs  */
+};
+
+struct dev_index {
+  unsigned major;
+  unsigned minor;
 };
 
 /* inode (on disk) */
@@ -50,6 +56,7 @@ struct sfs_disk_inode {
 			uint32_t slots;	/* # of entries in this directory */
 			uint32_t parent;	/* parent inode number */
 		} dirinfo;
+    struct dev_index devinfo;
 	};
 	uint16_t type;		/* one of SYS_TYPE_* above */
 	uint16_t nlinks;	/* # of hard links to this file */

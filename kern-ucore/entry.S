@@ -58,6 +58,8 @@ reset:
   bgtz $t3, 2b
   nop 
 
+  # imzhwk: i dont get why this is necessary,
+  # may anyone tell me? Will be very grateful.
   addiu $sp, $sp, -16
   la $t9, kern_init 
   jal $t9
