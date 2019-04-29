@@ -12,6 +12,3 @@ After you set up the environment, you can just make and run the run.bat (UNCOMME
 
 The .vscode directory gives an example about how to use GDB to debug the OS in Visual Studio Code with the Native Debug extension. You can just run the run.bat and setup a breakpoint. Then press "F5" to debug in vscode.
 
-to run hos-mips in GXEMUL, you can refer to (in CHINESE)
-https://github.com/klx3300/hos-mips/blob/master/RUN_USING_GXEMUL.md
-

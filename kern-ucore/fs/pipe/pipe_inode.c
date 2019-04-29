@@ -142,7 +142,6 @@ static const struct inode_ops pipe_node_ops = {
 	.vop_unlink = NULL_VOP_NOTDIR,
 	.vop_lookup = NULL_VOP_NOTDIR,
 	.vop_lookup_parent = NULL_VOP_NOTDIR,
-  .vop_mknod = NULL_VOP_INVAL,
 };
 
 static void

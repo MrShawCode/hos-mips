@@ -228,8 +228,6 @@ struct inode_ops {
 			   struct inode ** node_store);
 	int (*vop_lookup_parent) (struct inode * node, char *path,
 				  struct inode ** node_store, char **endp);
-  int (*vop_mknod)(struct inode *node, const char *name, struct dev_index devindex,
-                   struct inode **node_store);
 };
 
 int null_vop_pass(void);
@@ -277,7 +275,6 @@ void inode_check(struct inode *node, const char *opstr);
 #define vop_fs(node)                                                ((node)->in_fs)
 #define vop_init(node, ops, fs)                                     inode_init(node, ops, fs)
 #define vop_kill(node)                                              inode_kill(node)
-#define vop_mknod(node, name, index, node_store)                    (__vop_op(node, mknod)(node, name, index, node_store))
 
 /*
  * Reference count manipulation (handled above filesystem level)

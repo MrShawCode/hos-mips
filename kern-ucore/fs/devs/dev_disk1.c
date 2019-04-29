@@ -81,19 +81,7 @@ void dev_init_disk1(void)
 	disk1_device_init(vop_info(node, device));
 
 	int ret;
-  struct dev_index index = vfs_register_dev(3, "disk1");
-  if (dev_index_is_invalid(index)) {
-    panic("disk1: vfs_register_dev error.\n");
-  }
-	if ((ret = vfs_add_dev(index, "disk1", node, 1)) != 0) {
+	if ((ret = vfs_add_dev("disk1", node, 1)) != 0) {
 		panic("disk1: vfs_add_dev: %e.\n", ret);
 	}
-}
-
-void dev_init_sfs_inode_disk1(void) {
-  int ret;
-  struct dev_index index = vfs_get_dev_index("disk1");
-  if ((ret = dev_make_sfs_inode("disk1", index)) != 0) {
-    panic("disk1: dev_make_sfs_inode: %e.\n", ret);
-  }
 }

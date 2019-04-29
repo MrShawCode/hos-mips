@@ -33,3 +33,6 @@ src/user-ucore/_initial
 
 # save vscode setting
 !.vscode/
+
+# fuck mac
+._*

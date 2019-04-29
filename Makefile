@@ -115,7 +115,6 @@ $(SFSIMG_FILE): $(TOOLS_MKSFS) userlib userapp FORCE | $(OBJPATH_ROOT)
 	@echo Making $@
 	@mkdir -p $(TMPSFS)
 	@mkdir -p $(TMPSFS)/lib/modules
-	@mkdir -p $(TMPSFS)/dev
 ifeq  ($(ON_FPGA), y)
 #here, you should add your own app to the $(TMPSFS)
 #
@@ -137,7 +136,7 @@ endif
 		echo " mips"; \
 		cp -r $(TOPDIR)/user/user-ucore/_initial/hello.txt $(TMPSFS); \
 		rm -f $@; \
-		dd if=/dev/zero of=$@ count=4800; \
+		dd if=/dev/zero of=$@ count=3600; \
 	else \
 		echo -n $(ARCH)." not mips"; \
 		cp -r $(TOPDIR)/user/user-ucore/_initial/* $(TMPSFS); \

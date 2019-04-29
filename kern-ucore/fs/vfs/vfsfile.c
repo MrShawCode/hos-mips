@@ -206,17 +206,3 @@ int vfs_mkdir(char *path)
 	vop_ref_dec(dir);
 	return ret;
 }
-
-int vfs_mknod(char *path, struct dev_index index)
-{
-  int ret;
-  char *name;
-  struct inode *dir, *node;
-  if ((ret = vfs_lookup_parent(path, &dir, &name)) != 0) {
-    return ret;
-  }
-
-  ret = vop_mknod(dir, name, index, &node);
-  vop_ref_inc(node);
-  return ret;
-}

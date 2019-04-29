@@ -205,6 +205,11 @@ repeat:
 void proc_run(struct proc_struct *proc)
 {
 	if (proc != current) {
+		// where's your trapframe?
+#ifdef K_DEBUG_EXPLICIT_PROC_RUN
+		kprintf("[KERN] Debug: proc_run %d/%d -> %d/%d\n",
+		current->pid, current->tid, proc->pid, proc->tid);
+#endif
 		bool intr_flag;
 		struct proc_struct *prev = current, *next = proc;
 		// kprintf("(%d) => %d\n\r", lapic_id, next->pid);
@@ -518,6 +523,7 @@ int do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf)
 	}
 
 	proc->parent = current;
+	memcpy(proc->name, current->name, PROC_NAME_LEN+1);
 	list_init(&(proc->thread_group));
 	assert(current->wait_state == 0);
 
@@ -945,7 +951,7 @@ int do_execve(const char *filename, const char **argv, const char **envp)
 	const char *path;
 
 	int ret = -E_INVAL;
-	snprintf(local_name, sizeof(local_name), "<null> %d", current->pid);
+	snprintf(local_name, sizeof(local_name), "%s %d", filename, current->pid);
 
 	int argc = 0, envc = 0;
 	if ((ret = copy_kargv(kargv, argv, EXEC_MAX_ARG_NUM, &argc)) != 0) {

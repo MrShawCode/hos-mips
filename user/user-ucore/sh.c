@@ -234,7 +234,8 @@ int main(int argc, char **argv)
 		printf("\n\r");
 		shcwd[0] = '\0';
 		int pid;
-		if ((pid = fork()) == 0) {
+		pid = fork();
+		if (pid == 0) {
 			ret = runcmd(buffer);
 			exit(ret);
 		}

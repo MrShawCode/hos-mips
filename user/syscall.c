@@ -11,6 +11,18 @@
 #define MAX_ARGS            5
 #define SYSCALL_BASE        0x80
 
+struct _syscall_args {
+	uint32_t num;
+	uint32_t a0;
+	uint32_t a1;
+	uint32_t a2;
+	uint32_t a3;
+	uint32_t a4;
+	uint32_t external;
+};
+
+extern int _u_syscall_intr(struct _syscall_args* sargs);
+
 uintptr_t syscall(int num, ...)
 {
 	va_list ap;
@@ -21,20 +33,30 @@ uintptr_t syscall(int num, ...)
 		arg[i] = va_arg(ap, uint32_t);
 	}
 	va_end(ap);
+	struct _syscall_args sargs = {0};
+	sargs.num = num;
+	sargs.a0 = arg[0];
+	sargs.a1 = arg[1];
+	sargs.a2 = arg[2];
+	sargs.a3 = arg[3];
+	sargs.a4 = arg[4];
 
 	//num += SYSCALL_BASE;//modified
-	asm volatile (".set noreorder;\n" "move $v0, %1;\n"	/* syscall no. */
-		      "move $a0, %2;\n"
-		      "move $a1, %3;\n"
-		      "move $a2, %4;\n"
-		      "move $a3, %5;\n"
-		      "move $t0, %6;\n"
-		      "syscall;\n" "nop;\n" "move %0, $v0;\n":"=r" (ret)
-		      :"r"(num), "r"(arg[0]), "r"(arg[1]), "r"(arg[2]),
-		      "r"(arg[3]), "r"(arg[4])
-		      :"a0", "a1", "a2", "a3", "v0", "t0");
-	return ret + 1 - 1;
+	// asm volatile (".set noreorder;\n" "move $v0, %1;\n"	/* syscall no. */
+	// 	      "move $a0, %2;\n"
+	// 	      "move $a1, %3;\n"
+	// 	      "move $a2, %4;\n"
+	// 	      "move $a3, %5;\n"
+	// 	      "move $t0, %6;\n"
+	// 	      "jal _u_syscall_intr;\n" "nop;\n" "move %0, $v0;\n":"=r" (ret)
+	// 	      :"r"(num), "r"(arg[0]), "r"(arg[1]), "r"(arg[2]),
+	// 	      "r"(arg[3]), "r"(arg[4])
+	// 	      :"a0", "a1", "a2", "a3", "v0", "t0");
+	ret = _u_syscall_intr(&sargs);
+
+	return ret;
 }
+
 
 int sys_exit(int error_code)
 {
@@ -246,12 +268,4 @@ sys_mount(const char *source, const char *target, const char *filesystemtype,
 int sys_umount(const char *target)
 {
 	return syscall(SYS_umount, target);
-}
-
-int sys_mknod(const char *path, unsigned major, unsigned minor) {
-  return syscall(SYS_mknod, path, major, minor);
-}
-
-int sys_getdevinfo(struct devinfo *cur_dev, struct devinfo *next_dev) {
-  return syscall(SYS_getdevinfo, cur_dev, next_dev);
 }

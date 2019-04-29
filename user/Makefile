@@ -5,7 +5,8 @@ ULIB_A := $(ULIB_OBJ_ROOT)/ulib.a
 
 TARGET_CFLAGS := -I. -Iinclude -Ilib -nostdinc -nostdlib -fno-builtin
 obj-y := dir.o file.o panic.o signal.o \
-				stdio.o syscall.o ulib.o umain.o mount.o
+				stdio.o syscall.o ulib.o umain.o mount.o \
+				asyscall.o
 obj-y += lib/hash.o lib/rand.o lib/printfmt.o lib/string.o 
 
 ifeq  ($(ON_FPGA), y)
@@ -16,7 +17,7 @@ endif
 
 ARCH_CFLAGS := -g -fno-builtin -nostdlib  -nostdinc -EL -G0 -Wformat -O0 -mno-mips16 -msoft-float -march=m14k  $(MACH_DEF) -msoft-float
 ARCH_LDFLAGS := 
-ARCH_OBJS := syscall.o initcode.o intr.o clone.o udivmod.o udivmodsi4.o divmod.o
+ARCH_OBJS := asyscall.o syscall.o initcode.o intr.o clone.o udivmod.o udivmodsi4.o divmod.o
 ARCH_INITCODE_OBJ := initcode.o
 
 obj-y += $(ARCH_OBJS)

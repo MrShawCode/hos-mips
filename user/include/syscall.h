@@ -39,7 +39,6 @@ int sys_mbox_info(int id, struct mboxinfo *info);
 
 struct stat;
 struct dirent;
-struct devinfo;
 
 int sys_open(const char *path, uint32_t open_flags);
 int sys_close(int fd);
@@ -63,7 +62,5 @@ int sys_mount(const char *source, const char *target,
 int sys_umount(const char *target);
 
 int sys_ioctl(int d, int request, unsigned long data);
-int sys_mknod(const char *path, unsigned major, unsigned minor);
-int sys_getdevinfo(struct devinfo *cur_dev, struct devinfo *next_dev);
 
 #endif /* !__USER_LIBS_SYSCALL_H__ */

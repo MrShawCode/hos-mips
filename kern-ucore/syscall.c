@@ -10,7 +10,6 @@
 #include <sysfile.h>
 #include <console.h>
 #include <error.h>
-#include <dev.h>
 
 #define current (pls_read(current))
 
@@ -41,7 +40,8 @@ sys_exec(uint32_t arg[]) {
     const char *name = (const char *)arg[0];
     const char **argv = (const char **)arg[1];
     const char **envp = (const char **)arg[2];
-    return do_execve(name, argv, envp);
+    int ret = do_execve(name, argv, envp);
+    return ret;
 }
 
 static uint32_t
@@ -265,21 +265,6 @@ sys_mkfifo(uint32_t arg[]) {
     return sysfile_mkfifo(name, open_flags);
 }
 
-static uint32_t
-sys_mknod(uint32_t arg[]) {
-  const char *path = (const char *)arg[0];
-  unsigned major = (unsigned)arg[1];
-  unsigned minor = (unsigned)arg[2];
-  return sysfile_mknod(path, major, minor);
-}
-
-static uint32_t
-sys_getdevinfo(uint32_t arg[]) {
-  struct devinfo *cur_dev = (struct devinfo *)arg[0];
-  struct devinfo *next_dev = (struct devinfo *)arg[1];
-  return dev_getdevinfo(cur_dev, next_dev);
-}
-
 static uint32_t (*syscalls[])(uint32_t arg[]) = {
     [SYS_exit]              sys_exit,
     [SYS_fork]              sys_fork,
@@ -318,8 +303,6 @@ static uint32_t (*syscalls[])(uint32_t arg[]) = {
     [SYS_dup]               sys_dup,
     [SYS_pipe]              sys_pipe,
     [SYS_mkfifo]            sys_mkfifo,
-    [SYS_mknod]             sys_mknod,
-    [SYS_getdevinfo]        sys_getdevinfo,
 };
 
 #define NUM_SYSCALLS        ((sizeof(syscalls)) / (sizeof(syscalls[0])))
@@ -339,6 +322,10 @@ void syscall(void)
 			arg[2] = tf->tf_regs.reg_r[MIPS_REG_A2];
 			arg[3] = tf->tf_regs.reg_r[MIPS_REG_A3];
 			arg[4] = tf->tf_regs.reg_r[MIPS_REG_T0];
+#ifdef K_DEBUG_TRACE_SYSCALL
+            kprintf("[ SYSCALL %d(%08x, %08x, %08x, %08x, %08x) ]\n", 
+            num, arg[0], arg[1], arg[2], arg[3], arg[4]);
+#endif
 			tf->tf_regs.reg_r[MIPS_REG_V0] = syscalls[num] (arg);
 			return;
 		}

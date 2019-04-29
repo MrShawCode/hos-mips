@@ -97,14 +97,23 @@ static inline void write_one_tlb(int index, unsigned int pagemask,
 	tlb_write_indexed();
 }
 
+extern uint32_t tlbwr_random_idx;
+
 static inline void tlb_replace_random(unsigned int pagemask, unsigned int hi,
 				      unsigned int low0, unsigned int low1)
 {
+    // our CPU did not implement the TLBWR instruction
+    // so we use this to mimic the behavior.
+    tlbwr_random_idx++;
+    if(tlbwr_random_idx >= 16){
+        tlbwr_random_idx = 0;
+    }
 	write_c0_entrylo0(low0);
 	write_c0_pagemask(pagemask);
 	write_c0_entrylo1(low1);
 	write_c0_entryhi(hi);
-	tlb_write_random();
+    write_c0_index(tlbwr_random_idx);
+	tlb_write_indexed();
 }
 
 static inline uint32_t pte2tlblow(pte_t pte)
@@ -131,6 +140,10 @@ static inline void tlb_refill(uint32_t badaddr, pte_t * pte)
     //kprintf("*pte+1=0x%08x\n\r",*(pte+1));
 //#ifdef MACH_QEMU
     //kprintf("badaddr=0x%08x\n\r",badaddr);
+#ifdef K_DEBUG_TLB_REFILL_PTE
+    kprintf("[ <- TLB Replace with (+0) %08x ]\n", *pte);
+    kprintf("[ <- TLB Replace with (+1) %08x ]\n", *(pte+1));
+#endif
     tlb_replace_random(0, badaddr & THUMIPS_TLB_ENTRYH_VPN2_MASK,
                pte2tlblow(*pte), pte2tlblow(*(pte + 1)));
 /*#elif defined MACH_FPGA

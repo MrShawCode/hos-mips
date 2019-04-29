@@ -15,7 +15,6 @@ void fs_init(void)
 	dev_init();
 	pipe_init();
 	sfs_init();
-	dev_sfs_inode_init();
 }
 
 void fs_cleanup(void)

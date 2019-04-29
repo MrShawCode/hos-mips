@@ -4,6 +4,7 @@
 void cons_init(void);
 void cons_putc(int c);
 int cons_getc(void);
+int cons_getc_gxemul(void);
 void serial_intr(void);
 void gxemul_input_intr(void);
 

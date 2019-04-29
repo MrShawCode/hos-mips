@@ -459,18 +459,3 @@ int sysfile_ioctl(int fd, unsigned int cmd, unsigned long arg)
 	}
 	return linux_devfile_ioctl(fd, cmd, arg);
 }
-
-int dev_make_sfs_inode(char *devname, struct dev_index index);
-
-int sysfile_mknod(const char *__path, uint32_t major, uint32_t minor)
-{
-  struct dev_index index = { major, minor };
-  int ret;
-  char *path;
-  if ((ret = copy_path(&path, __path)) != 0) {
-    return ret;
-  }
-  ret = vfs_mknod(path, index);
-  kfree(path);
-  return ret;
-}

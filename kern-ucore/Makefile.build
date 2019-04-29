@@ -7,7 +7,13 @@ PHONY+=all subdir clean
 TARGET_CFLAGS := -g -ggdb
 TARGET_CFLAGS += -fno-builtin -nostdlib  -nostdinc -Wformat -mno-mips16 -mno-micromips -msoft-float -march=m14k
 TARGET_CFLAGS += -D__KERNEL__ -D__KERN__
-#TARGET_CFLAGS += -DBUILD_GXEMUL
+TARGET_CFLAGS += -DBUILD_GXEMUL -DK_DEBUG
+# TARGET_CFLAGS += -DK_DEBUG_COPY_RANGE # print copy_range copied range
+# TARGET_CFLAGS += -DK_DEBUG_TLBMISS_ADDR # print tlb miss address
+# TARGET_CFLAGS += -DK_DEBUG_EXPLICIT_PROC_RUN # print process information when executing proc_run
+# TARGET_CFLAGS += -DK_DEBUG_INSPECT_USER_PGFAULT # give kernel monitor when user space program pgfault.
+# TARGET_CFLAGS += -DK_DEBUG_TRACE_SYSCALL # print every syscall executed
+# TARGET_CFLAGS += -DK_DEBUG_TLB_REFILL_PTE # print the tlb refill pte in userspace
 TARGET_CFLAGS += $(shell echo $(UCONFIG_ADDITIONAL_CFLAGS))
 
 TARGET_LDFLAGS += $(shell echo $(UCONFIG_ADDITIONAL_LDFLAGS))

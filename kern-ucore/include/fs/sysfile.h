@@ -24,7 +24,6 @@ int sysfile_getdirentry(int fd, struct dirent *direntp, uint32_t * len);
 int sysfile_dup(int fd1, int fd2);
 int sysfile_pipe(int *fd_store);
 int sysfile_mkfifo(const char *name, uint32_t open_flags);
-int sysfile_mknod(const char *path, uint32_t major, uint32_t minor);
 
 int sysfile_ioctl(int fd, unsigned int cmd, unsigned long arg);
 

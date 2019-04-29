@@ -177,10 +177,15 @@ static int serial_proc_data(void)
 // no need for comment, because the effective
 // handler dispatching already have this!
 void gxemul_input_intr(void){
-	int c = cons_getc();
-	// why previous HOS guys not make a header for this???
-	extern void dev_stdin_write(char c);
-	dev_stdin_write(c);
+	int c = 0;
+	do{
+		c = cons_getc_gxemul();
+		// why previous HOS guys not make a header for this???
+		extern void dev_stdin_write(char c);
+		if(c != -1){
+			dev_stdin_write(c & 0xFF);
+		}
+	}while(c != -1);
 }
 
 void serial_int_handler(void *opaque)
@@ -305,6 +310,34 @@ int cons_getc(void)
 			if (cons.rpos == CONSBUFSIZE) {
 				cons.rpos = 0;
 			}
+		}
+	}
+	local_intr_restore(intr_flag);
+#ifdef DEBUG_COM1
+	if (c) kprintf("cons_get(0x%x)\n\r", c);
+#endif
+	return c;
+}
+
+int cons_getc_gxemul(void)
+{
+	int c = 0;
+	bool intr_flag;
+	local_intr_save(intr_flag);
+	{
+		// poll for any pending input characters,
+		// so that this function works even when interrupts are disabled
+		// (e.g., when called from the kernel monitor).
+		serial_intr();
+
+		// grab the next character from the input buffer.
+		if (cons.rpos != cons.wpos) {
+			c = cons.buf[cons.rpos++];
+			if (cons.rpos == CONSBUFSIZE) {
+				cons.rpos = 0;
+			}
+		} else {
+			c = -1;
 		}
 	}
 	local_intr_restore(intr_flag);

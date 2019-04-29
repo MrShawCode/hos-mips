@@ -64,19 +64,7 @@ void dev_init_null(void)
 	null_device_init(vop_info(node, device));
 
 	int ret;
-  struct dev_index index = vfs_register_dev(0, "null");
-  if (dev_index_is_invalid(index)) {
-    panic("null: vfs_register_dev error.\n");
-  }
-	if ((ret = vfs_add_dev(index, "null", node, 0)) != 0) {
+	if ((ret = vfs_add_dev("null", node, 0)) != 0) {
 		panic("null: vfs_add_dev: %e.\n", ret);
 	}
-}
-
-void dev_init_sfs_inode_null(void) {
-  int ret;
-  struct dev_index index = vfs_get_dev_index("null");
-  if ((ret = dev_make_sfs_inode("null", index)) != 0) {
-    panic("null: dev_make_sfs_inode: %e.\n", ret);
-  }
 }

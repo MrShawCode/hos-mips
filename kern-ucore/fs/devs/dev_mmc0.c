@@ -143,19 +143,7 @@ void dev_init_mmc0(void)
 	mmc0_device_init(vop_info(node, device));
 
 	int ret;
-  struct dev_index index = vfs_register_dev(3, "mmc0");
-  if (dev_index_is_invalid(index)) {
-    panic("mmc0: vfs_register_dev error.\n");
-  }
-	if ((ret = vfs_add_dev(index, "mmc0", node, 1)) != 0) {
+	if ((ret = vfs_add_dev("mmc0", node, 1)) != 0) {
 		panic("mmc0: vfs_add_dev: %e.\n", ret);
 	}
-}
-
-void dev_init_sfs_inode_mmc0(void) {
-  int ret;
-  struct dev_index index = vfs_get_dev_index("mmc0");
-  if ((ret = dev_make_sfs_inode("mmc0", index)) != 0) {
-    panic("mmc0: dev_make_sfs_inode: %e.\n", ret);
-  }
 }

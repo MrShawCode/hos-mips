@@ -17,11 +17,13 @@ int close(int fd)
 
 int read(int fd, void *base, size_t len)
 {
+	// cprintf("[ USERLIB DEBUG: read() ]\n");
 	return sys_read(fd, base, len);
 }
 
 int write(int fd, void *base, size_t len)
 {
+	// cprintf("[ USERLIB DEBUG: write() ]\n");
 	return sys_write(fd, base, len);
 }
 
@@ -58,16 +60,6 @@ int pipe(int *fd_store)
 int mkfifo(const char *name, uint32_t open_flags)
 {
 	return sys_mkfifo(name, open_flags);
-}
-
-int mknod(const char *path, unsigned major, unsigned minor)
-{
-  return sys_mknod(path, major, minor);
-}
-
-int getdevinfo(struct devinfo *cur_dev, struct devinfo *next_dev)
-{
-  return sys_getdevinfo(cur_dev, next_dev);
 }
 
 static char transmode(struct stat *stat)

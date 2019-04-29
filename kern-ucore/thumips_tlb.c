@@ -24,6 +24,8 @@
 #include <pmm.h>
 #include <thumips_tlb.h>
 
+uint32_t tlbwr_random_idx;
+
 // invalidate both TLB 
 // (clean and flush, meaning we write the data back)
 void tlb_invalidate(pde_t * pgdir, uintptr_t la)

@@ -2,11 +2,9 @@
 #define __KERN_FS_DEVS_DEV_H__
 
 #include <types.h>
-#include <unistd.h>
 
 struct inode;
 struct iobuf;
-struct dev_index;
 
 struct file_operations;
 
@@ -55,16 +53,7 @@ struct device {
 #define dev_is_linux_dev(dev) ((dev)->linux_dentry != NULL)
 
 void dev_init(void);
-void dev_sfs_inode_init(void);
 /* Create inode for a vfs-level device. */
 struct inode *dev_create_inode(void);
-int dev_make_sfs_inode(char *devname, struct dev_index index);
-
-struct devinfo {
-  unsigned major;
-  unsigned minor;
-  char name[FS_MAX_DNAME_LEN];
-};
-int dev_getdevinfo(struct devinfo *cur_dev, struct devinfo *next_dev);
 
 #endif /* !__KERN_FS_DEVS_DEV_H__ */
