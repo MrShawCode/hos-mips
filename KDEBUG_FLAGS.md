@@ -1,0 +1,2 @@
+- K_DEBUG_TLBMISS_ADDR - print TLB Miss Address when a TLB Miss Exception occurred.
+- K_DEBUG_COPY_RANGE
