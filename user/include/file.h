@@ -2,8 +2,14 @@
 #define __USER_LIBS_FILE_H__
 
 #include <types.h>
+#include <unistd.h>
 
 struct stat;
+struct devinfo {
+  unsigned major;
+  unsigned minor;
+  char name[FS_MAX_DNAME_LEN];
+};
 
 int open(const char *path, uint32_t open_flags);
 int close(int fd);
@@ -16,6 +22,9 @@ int dup(int fd);
 int dup2(int fd1, int fd2);
 int pipe(int *fd_store);
 int mkfifo(const char *name, uint32_t open_flags);
+int mknod(const char *path, unsigned major, unsigned minor);
+int getdevinfo(struct devinfo *cur_dev, struct devinfo *next_dev);
+
 
 void print_stat(const char *name, int fd, struct stat *stat);
 

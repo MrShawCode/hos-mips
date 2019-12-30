@@ -128,7 +128,19 @@ void dev_init_stdin(void)
 	stdin_device_init(vop_info(node, device));
 
 	int ret;
-	if ((ret = vfs_add_dev("stdin", node, 0)) != 0) {
+  struct dev_index index = vfs_register_dev(1, "stdin");
+  if (dev_index_is_invalid(index)) {
+    panic("stdin: vfs_register_dev error.\n");
+  }
+	if ((ret = vfs_add_dev(index, "stdin", node, 0)) != 0) {
 		panic("stdin: vfs_add_dev: %e.\n\r", ret);
 	}
+}
+
+void dev_init_sfs_inode_stdin(void) {
+  int ret;
+  struct dev_index index = vfs_get_dev_index("stdin");
+  if ((ret = dev_make_sfs_inode("stdin", index)) != 0) {
+    panic("stdin: dev_make_sfs_inode: %e.\n", ret);
+  }
 }

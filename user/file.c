@@ -60,6 +60,16 @@ int mkfifo(const char *name, uint32_t open_flags)
 	return sys_mkfifo(name, open_flags);
 }
 
+int mknod(const char *path, unsigned major, unsigned minor)
+{
+  return sys_mknod(path, major, minor);
+}
+
+int getdevinfo(struct devinfo *cur_dev, struct devinfo *next_dev)
+{
+  return sys_getdevinfo(cur_dev, next_dev);
+}
+
 static char transmode(struct stat *stat)
 {
 	uint32_t mode = stat->st_mode;

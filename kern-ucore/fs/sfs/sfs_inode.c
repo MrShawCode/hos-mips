@@ -15,6 +15,7 @@
 
 static const struct inode_ops sfs_node_dirops;
 static const struct inode_ops sfs_node_fileops;
+static const struct inode_ops sfs_node_devops;
 
 static inline int trylock_sin(struct sfs_inode *sin)
 {
@@ -40,6 +41,8 @@ static const struct inode_ops *sfs_get_ops(uint16_t type)
 		return &sfs_node_dirops;
 	case SFS_TYPE_FILE:
 		return &sfs_node_fileops;
+  case SFS_TYPE_DEVICE:
+    return &sfs_node_devops;
 	}
 	panic("invalid file type %d.\n", type);
 }
@@ -1464,6 +1467,207 @@ next:
 		node = subnode, path = subpath;
 	}
 }
+// - Device Start
+
+static int
+sfs_mknod_nolock(struct sfs_fs *sfs, struct sfs_inode *sin,
+                 const char *name, struct dev_index devindex,
+                 struct inode **node_store) {
+  int ret, slot;
+  struct inode *link_node;
+  if ((ret =
+       sfs_dirent_search_nolock(sfs, sin, name, NULL, NULL, &slot)) != -E_NOENT) {
+    return (ret != 0) ? ret : -E_EXISTS;
+  }
+  if ((ret =
+       sfs_dirent_create_inode(sfs, SFS_TYPE_DEVICE, &link_node)) != 0) {
+    return ret;
+  }
+  if ((ret =
+       sfs_dirent_link_nolock(sfs, sin, slot, vop_info(link_node, sfs_inode), name)) != 0) {
+    vop_ref_dec(link_node);
+    return ret;
+  }
+  struct sfs_disk_inode *din = vop_info(link_node, sfs_inode)->din;
+  din->devinfo = devindex;
+  *node_store = link_node;
+  return ret;
+}
+
+static int
+sfs_mknod(struct inode *node, const char *name, struct dev_index devindex,
+          struct inode **node_store) {
+  if (strlen(name) > SFS_MAX_FNAME_LEN) {
+    return -E_TOO_BIG;
+  }
+  if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
+    return -E_EXISTS;
+  }
+  if (check_dev_exist(devindex) == 0) {
+    return -E_NO_DEV;
+  }
+  struct sfs_fs *sfs = fsop_info(vop_fs(node), sfs);
+  struct sfs_inode *sin = vop_info(node, sfs_inode);
+  int ret;
+  if ((ret = trylock_sin(sin)) == 0) {
+    ret = sfs_mknod_nolock(sfs, sin, name, devindex, node_store);
+    unlock_sin(sin);
+  }
+  return ret;
+}
+
+static int sfs_opendev(struct inode *node, uint32_t open_flags)
+{
+  int ret;
+  struct sfs_disk_inode *din = vop_info(node, sfs_inode)->din;
+  struct inode *devnode;
+  if ((ret = vfs_get_devnode(din->devinfo, &devnode)) != 0) {
+    return ret;
+  }
+  if (open_flags & (O_CREAT | O_TRUNC | O_EXCL | O_APPEND)) {
+    return -E_INVAL;
+  }
+  struct device *dev = vop_info(devnode, device);
+  return dop_open(dev, open_flags);
+}
+
+static int sfs_closedev(struct inode *node)
+{
+  int ret;
+  struct sfs_disk_inode *din = vop_info(node, sfs_inode)->din;
+  struct inode *devnode;
+  if ((ret = vfs_get_devnode(din->devinfo, &devnode)) != 0) {
+    return ret;
+  }
+  struct device *dev = vop_info(devnode, device);
+  return dop_close(dev);
+}
+
+static int sfs_devread(struct inode *node, struct iobuf *iob)
+{
+  int ret;
+  struct sfs_disk_inode *din = vop_info(node, sfs_inode)->din;
+  struct inode *devnode;
+  if ((ret = vfs_get_devnode(din->devinfo, &devnode)) != 0) {
+    return ret;
+  }
+  struct device *dev = vop_info(devnode, device);
+  return dop_io(dev, iob, 0);
+}
+
+static int sfs_devwrite(struct inode *node, struct iobuf *iob)
+{
+  int ret;
+  struct sfs_disk_inode *din = vop_info(node, sfs_inode)->din;
+  struct inode *devnode;
+  if ((ret = vfs_get_devnode(din->devinfo, &devnode)) != 0) {
+    return ret;
+  }
+  struct device *dev = vop_info(devnode, device);
+  return dop_io(dev, iob, 1);
+}
+
+static int sfs_devfstat(struct inode *node, struct stat *stat)
+{
+  int ret;
+  struct sfs_disk_inode *din = vop_info(node, sfs_inode)->din;
+  struct inode *devnode;
+  if ((ret = vfs_get_devnode(din->devinfo, &devnode)) != 0) {
+    return ret;
+  }
+  memset(stat, 0, sizeof(struct stat));
+  if ((ret = vop_gettype(node, &(stat->st_mode))) != 0) {
+    return ret;
+  }
+  struct device *dev = vop_info(devnode, device);
+  stat->st_nlinks = 1;
+  stat->st_blocks = dev->d_blocks;
+  stat->st_size = stat->st_blocks * dev->d_blocksize;
+  return 0;
+}
+
+static int sfs_devioctl(struct inode *node, int op, void *data)
+{
+  int ret;
+  struct sfs_disk_inode *din = vop_info(node, sfs_inode)->din;
+  struct inode *devnode;
+  if ((ret = vfs_get_devnode(din->devinfo, &devnode)) != 0) {
+    return ret;
+  }
+  struct device *dev = vop_info(devnode, device);
+  return dop_ioctl(dev, op, data);
+}
+
+static int sfs_devgettype(struct inode *node, uint32_t * type_store)
+{
+  int ret;
+  struct sfs_disk_inode *din = vop_info(node, sfs_inode)->din;
+  struct inode *devnode;
+  if ((ret = vfs_get_devnode(din->devinfo, &devnode)) != 0) {
+    return ret;
+  }
+  struct device *dev = vop_info(devnode, device);
+  *type_store = (dev->d_blocks > 0) ? S_IFBLK : S_IFCHR;
+  return 0;
+}
+
+static int sfs_devtryseek(struct inode *node, off_t pos)
+{
+  int ret;
+  struct sfs_disk_inode *din = vop_info(node, sfs_inode)->din;
+  struct inode *devnode;
+  if ((ret = vfs_get_devnode(din->devinfo, &devnode)) != 0) {
+    return ret;
+  }
+  struct device *dev = vop_info(devnode, device);
+  if (dev->d_blocks > 0) {
+    if ((pos % dev->d_blocksize) == 0) {
+      if (pos >= 0 && pos < dev->d_blocks * dev->d_blocksize) {
+        return 0;
+      }
+    }
+  }
+  return -E_INVAL;
+}
+
+static int sfs_devlookup(struct inode *node, char *path, struct inode **node_store)
+{
+  if (*path != '\0') {
+    return -E_NOENT;
+  }
+  vop_ref_inc(node);
+  *node_store = node;
+  return 0;
+}
+
+// - End
+
+static const struct inode_ops sfs_node_devops = {
+  .vop_magic = VOP_MAGIC,
+  .vop_open = sfs_opendev,
+  .vop_close = sfs_closedev,
+  .vop_read = sfs_devread,
+  .vop_write = sfs_devwrite,
+  .vop_fstat = sfs_devfstat,
+  .vop_fsync = NULL_VOP_PASS,
+  .vop_mkdir = NULL_VOP_NOTDIR,
+  .vop_link = NULL_VOP_NOTDIR,
+  .vop_rename = NULL_VOP_NOTDIR,
+  .vop_readlink = NULL_VOP_INVAL,
+  .vop_symlink = NULL_VOP_NOTDIR,
+  .vop_namefile = NULL_VOP_PASS,
+  .vop_getdirentry = NULL_VOP_INVAL,
+  .vop_reclaim = NULL_VOP_PASS,
+  .vop_ioctl = sfs_devioctl,
+  .vop_gettype = sfs_devgettype,
+  .vop_tryseek = sfs_devtryseek,
+  .vop_truncate = NULL_VOP_INVAL,
+  .vop_create = NULL_VOP_NOTDIR,
+  .vop_unlink = NULL_VOP_NOTDIR,
+  .vop_lookup = sfs_devlookup,
+  .vop_lookup_parent = NULL_VOP_NOTDIR,
+  .vop_mknod = NULL_VOP_NOTDIR,
+};
 
 static const struct inode_ops sfs_node_dirops = {
 	.vop_magic = VOP_MAGIC,
@@ -1489,6 +1693,7 @@ static const struct inode_ops sfs_node_dirops = {
 	.vop_unlink = sfs_unlink,
 	.vop_lookup = sfs_lookup,
 	.vop_lookup_parent = sfs_lookup_parent,
+  .vop_mknod = sfs_mknod,
 };
 
 static const struct inode_ops sfs_node_fileops = {
@@ -1515,4 +1720,5 @@ static const struct inode_ops sfs_node_fileops = {
 	.vop_unlink = NULL_VOP_NOTDIR,
 	.vop_lookup = NULL_VOP_NOTDIR,
 	.vop_lookup_parent = NULL_VOP_NOTDIR,
+  .vop_mknod = NULL_VOP_NOTDIR,
 };

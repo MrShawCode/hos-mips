@@ -11,7 +11,7 @@
 
 static int stdout_open(struct device *dev, uint32_t open_flags)
 {
-	if (open_flags != O_WRONLY) {
+	if (open_flags != O_WRONLY && open_flags != O_RDONLY) {
 		return -E_INVAL;
 	}
 	return 0;
@@ -59,7 +59,19 @@ void dev_init_stdout(void)
 	stdout_device_init(vop_info(node, device));
 
 	int ret;
-	if ((ret = vfs_add_dev("stdout", node, 0)) != 0) {
+  struct dev_index index = vfs_register_dev(2, "stdout");
+  if (dev_index_is_invalid(index)) {
+    panic("stdout: vfs_register_dev error.\n");
+  }
+	if ((ret = vfs_add_dev(index, "stdout", node, 0)) != 0) {
 		panic("stdout: vfs_add_dev: %e.\n", ret);
 	}
+}
+
+void dev_init_sfs_inode_stdout(void) {
+  int ret;
+  struct dev_index index = vfs_get_dev_index("stdout");
+  if ((ret = dev_make_sfs_inode("stdout", index)) != 0) {
+    panic("stdout: dev_make_sfs_inode: %e.\n", ret);
+  }
 }

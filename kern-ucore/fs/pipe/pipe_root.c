@@ -158,6 +158,7 @@ static const struct inode_ops pipe_root_ops = {
 	.vop_unlink = NULL_VOP_INVAL,
 	.vop_lookup = pipe_root_lookup,
 	.vop_lookup_parent = pipe_root_lookup_parent,
+  .vop_mknod = NULL_VOP_INVAL,
 };
 
 struct inode *pipe_create_root(struct fs *fs)
